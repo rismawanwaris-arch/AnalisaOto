@@ -1,0 +1,25 @@
+# Dependencies & Build Artifacts
+node_modules/
+dist/
+*.log
+npm-debug.log*
+
+# Environment & Secrets (NEVER commit to GitHub)
+.env
+.env.*
+!.env.example
+
+# Company Transaction Data, Sample Excel Files & Auth Secrets (NEVER commit to GitHub)
+data/
+sample-data/
+*.xlsx
+*.xls
+*.csv
+.session_secret
+.auth_config.json
+
+# OS / Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

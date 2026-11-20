@@ -1,0 +1,12 @@
+node_modules
+dist
+data
+sample-data
+.env
+.env.*
+*.xlsx
+*.xls
+*.csv
+.git
+.DS_Store
+*.log

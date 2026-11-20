@@ -1,0 +1,132 @@
+export const DEFAULT_CATEGORIES = [
+  {
+    id: 'cat_transfer_bank',
+    name: 'Transfer Bank & Finansial',
+    shortName: 'Transfer Bank',
+    color: '#6366f1',
+    icon: 'Landmark',
+    description: 'Layanan kirim uang antar bank, transfer virtual account, dan produk finansial perbankan.',
+    order: 1,
+  },
+  {
+    id: 'cat_ewallet',
+    name: 'Topup E-Wallet & Saldo Digital',
+    shortName: 'Topup E-Wallet',
+    color: '#06b6d4',
+    icon: 'Wallet',
+    description: 'Pengisian saldo dompet digital (DANA, GoPay, ShopeePay, OVO, Grab, QRIS).',
+    order: 2,
+  },
+  {
+    id: 'cat_ppob',
+    name: 'Pembayaran Tagihan / Listrik & Berlangganan (PPOB)',
+    shortName: 'Tagihan PPOB & Listrik',
+    color: '#f59e0b',
+    icon: 'Zap',
+    description: 'Token PLN prabayar, tagihan listrik pascabayar, BPJS Kesehatan, internet IndiHome/Speedy, dan PDAM.',
+    order: 3,
+  },
+  {
+    id: 'cat_pulsa_data',
+    name: 'Pulsa Reguler & Paket Data Seluler',
+    shortName: 'Pulsa & Paket Data',
+    color: '#10b981',
+    icon: 'Smartphone',
+    description: 'Pulsa reguler dan paket kuota data seluruh operator seluler (Telkomsel, Indosat, XL, Axis, Tri, Smartfren, By.U).',
+    order: 4,
+  },
+  {
+    id: 'cat_voucher',
+    name: 'Penjualan Voucher (Fisik / Gesek / Inject)',
+    shortName: 'Penjualan Voucher',
+    color: '#ec4899',
+    icon: 'Ticket',
+    description: 'Penjualan voucher fisik, gesek, dan inject kuota (Modul VOUCHER, INJECT VC, VA*, VT*, VSM*, SV*).',
+    order: 5,
+  },
+];
+
+export const DEFAULT_RULES = [
+  // 1. Transfer Bank & Finansial
+  { id: 'rule_tbca', categoryId: 'cat_transfer_bank', subCategory: 'Bank BCA', matchType: 'prefix', pattern: 'TBCA', note: 'Transfer Bank BCA' },
+  { id: 'rule_fbank014', categoryId: 'cat_transfer_bank', subCategory: 'Bank BCA', matchType: 'prefix', pattern: 'FBANK014', note: 'FastBank BCA (014)' },
+  { id: 'rule_tbri', categoryId: 'cat_transfer_bank', subCategory: 'Bank BRI', matchType: 'prefix', pattern: 'TBRI', note: 'Transfer Bank BRI' },
+  { id: 'rule_fbank002', categoryId: 'cat_transfer_bank', subCategory: 'Bank BRI', matchType: 'prefix', pattern: 'FBANK002', note: 'FastBank BRI (002)' },
+  { id: 'rule_tbmd', categoryId: 'cat_transfer_bank', subCategory: 'Bank Mandiri', matchType: 'prefix', pattern: 'TBMD', note: 'Transfer Bank Mandiri' },
+  { id: 'rule_tbsea', categoryId: 'cat_transfer_bank', subCategory: 'SeaBank', matchType: 'prefix', pattern: 'TBSEA', note: 'Transfer SeaBank' },
+  { id: 'rule_fbank535', categoryId: 'cat_transfer_bank', subCategory: 'SeaBank', matchType: 'prefix', pattern: 'FBANK535', note: 'FastBank SeaBank (535)' },
+  { id: 'rule_tbni', categoryId: 'cat_transfer_bank', subCategory: 'Bank BNI', matchType: 'prefix', pattern: 'TBNI', note: 'Transfer Bank BNI' },
+  { id: 'rule_tbbsi', categoryId: 'cat_transfer_bank', subCategory: 'Bank Syariah Indonesia (BSI)', matchType: 'prefix', pattern: 'TBBSI', note: 'Transfer Bank BSI' },
+  { id: 'rule_tbjago', categoryId: 'cat_transfer_bank', subCategory: 'Bank Jago', matchType: 'prefix', pattern: 'TBJAGO', note: 'Transfer Bank Jago' },
+  { id: 'rule_tbtn', categoryId: 'cat_transfer_bank', subCategory: 'Bank BTN', matchType: 'prefix', pattern: 'TBTN', note: 'Transfer Bank BTN' },
+  { id: 'rule_fbank200', categoryId: 'cat_transfer_bank', subCategory: 'Bank BTN', matchType: 'prefix', pattern: 'FBANK200', note: 'FastBank BTN (200)' },
+  { id: 'rule_tbroyal', categoryId: 'cat_transfer_bank', subCategory: 'Blu by BCA Digital (Royal)', matchType: 'prefix', pattern: 'TBROYAL', note: 'Transfer BCA Digital / Blu' },
+  { id: 'rule_tballo', categoryId: 'cat_transfer_bank', subCategory: 'Allo Bank', matchType: 'prefix', pattern: 'TBALLO', note: 'Transfer Allo Bank' },
+  { id: 'rule_fbank562', categoryId: 'cat_transfer_bank', subCategory: 'Allo Bank', matchType: 'prefix', pattern: 'FBANK562', note: 'FastBank Allo Bank (562)' },
+  { id: 'rule_tbneo', categoryId: 'cat_transfer_bank', subCategory: 'Bank Neo Commerce (BNC)', matchType: 'prefix', pattern: 'TBNEO', note: 'Transfer Bank Neo Commerce' },
+  { id: 'rule_tbmua', categoryId: 'cat_transfer_bank', subCategory: 'Bank Muamalat', matchType: 'prefix', pattern: 'TBMUA', note: 'Transfer Bank Muamalat' },
+  { id: 'rule_tbocbc', categoryId: 'cat_transfer_bank', subCategory: 'Bank OCBC NISP', matchType: 'prefix', pattern: 'TBOCBC', note: 'Transfer Bank OCBC NISP' },
+  { id: 'rule_tb_generic', categoryId: 'cat_transfer_bank', subCategory: 'Bank Lainnya', matchType: 'prefix', pattern: 'TB', note: 'Default Transfer Bank (TB*)' },
+  { id: 'rule_fbank_generic', categoryId: 'cat_transfer_bank', subCategory: 'Bank Lainnya', matchType: 'prefix', pattern: 'FBANK', note: 'Default FastBank (FBANK*)' },
+
+  // 2. Topup E-Wallet & Saldo Digital
+  { id: 'rule_dana', categoryId: 'cat_ewallet', subCategory: 'DANA', matchType: 'prefix', pattern: 'DANA', note: 'Topup Saldo DANA' },
+  { id: 'rule_go', categoryId: 'cat_ewallet', subCategory: 'GoPay', matchType: 'prefix', pattern: 'GO', note: 'Topup Saldo GoPay Customer/Driver' },
+  { id: 'rule_shp', categoryId: 'cat_ewallet', subCategory: 'ShopeePay', matchType: 'prefix', pattern: 'SHP', note: 'Topup Saldo ShopeePay' },
+  { id: 'rule_ovo', categoryId: 'cat_ewallet', subCategory: 'OVO', matchType: 'prefix', pattern: 'OVO', note: 'Topup Saldo OVO' },
+  { id: 'rule_grab', categoryId: 'cat_ewallet', subCategory: 'Grab', matchType: 'prefix', pattern: 'GRAB', note: 'Topup Saldo Grab / OVO Grab' },
+  { id: 'rule_tdoqr', categoryId: 'cat_ewallet', subCategory: 'QRIS & Saldo Digital', matchType: 'exact', pattern: 'TDOQR', note: 'Transaksi Saldo QRIS (TDOQR)' },
+
+  // 3. Pembayaran Tagihan / Listrik & Berlangganan (PPOB)
+  { id: 'rule_tknc', categoryId: 'cat_ppob', subCategory: 'Token Listrik PLN', matchType: 'prefix', pattern: 'TKNC', note: 'Token PLN Promo/Cepat' },
+  { id: 'rule_tkn', categoryId: 'cat_ppob', subCategory: 'Token Listrik PLN', matchType: 'prefix', pattern: 'TKN', note: 'Token Listrik PLN' },
+  { id: 'rule_pln', categoryId: 'cat_ppob', subCategory: 'Token Listrik PLN', matchType: 'prefix', pattern: 'PLN', note: 'Token Listrik PLN Reguler' },
+  { id: 'rule_ppln', categoryId: 'cat_ppob', subCategory: 'Tagihan PLN Pascabayar', matchType: 'prefix', pattern: 'PPLN', note: 'Pembayaran Tagihan PLN Pascabayar' },
+  { id: 'rule_bpjs', categoryId: 'cat_ppob', subCategory: 'BPJS Kesehatan', matchType: 'prefix', pattern: 'BPJS', note: 'Tagihan BPJS Kesehatan' },
+  { id: 'rule_spdy', categoryId: 'cat_ppob', subCategory: 'Internet & Telkom (Speedy/IndiHome)', matchType: 'prefix', pattern: 'SPDY', note: 'Tagihan IndiHome / Speedy' },
+
+  // 5. Penjualan Voucher (Fisik / Gesek / Inject)
+  { id: 'rule_mod_voucher', categoryId: 'cat_voucher', subCategory: 'Voucher Fisik & Inject', matchType: 'module', pattern: 'VOUCHER', note: 'Modul Supplier VOUCHER' },
+  { id: 'rule_mod_inject_vc', categoryId: 'cat_voucher', subCategory: 'Voucher Fisik & Inject', matchType: 'module', pattern: 'INJECT VC', note: 'Modul Supplier INJECT VC' },
+  { id: 'rule_va', categoryId: 'cat_voucher', subCategory: 'Voucher Axis', matchType: 'prefix', pattern: 'VA', note: 'Voucher Data Axis (VA*)' },
+  { id: 'rule_vt', categoryId: 'cat_voucher', subCategory: 'Voucher Tri (3)', matchType: 'prefix', pattern: 'VT', note: 'Voucher Data Tri (VT*)' },
+  { id: 'rule_vsm', categoryId: 'cat_voucher', subCategory: 'Voucher Smartfren', matchType: 'prefix', pattern: 'VSM', note: 'Voucher Data Smartfren (VSM*)' },
+  { id: 'rule_sv', categoryId: 'cat_voucher', subCategory: 'Voucher Smartfren', matchType: 'prefix', pattern: 'SV', note: 'Inject Voucher Smartfren (SV*)' },
+  { id: 'rule_viy', categoryId: 'cat_voucher', subCategory: 'Voucher Indosat', matchType: 'prefix', pattern: 'VIY', note: 'Voucher Data Indosat (VIY*)' },
+
+  // 4. Pulsa Reguler & Paket Data Seluler
+  { id: 'rule_byu', categoryId: 'cat_pulsa_data', subCategory: 'By.U (Telkomsel Digital)', matchType: 'prefix', pattern: 'BYU', note: 'Pulsa & Data By.U' },
+  { id: 'rule_sr', categoryId: 'cat_pulsa_data', subCategory: 'Smartfren', matchType: 'prefix', pattern: 'SR', note: 'Pulsa Reguler Smartfren' },
+  { id: 'rule_sm', categoryId: 'cat_pulsa_data', subCategory: 'Smartfren', matchType: 'prefix', pattern: 'SM', note: 'Paket Data Smartfren' },
+  { id: 'rule_ax', categoryId: 'cat_pulsa_data', subCategory: 'Axis', matchType: 'prefix', pattern: 'AX', note: 'Pulsa & Paket Data Axis' },
+  { id: 'rule_ah', categoryId: 'cat_pulsa_data', subCategory: 'Axis', matchType: 'prefix', pattern: 'AH', note: 'Paket Data Axis Harian/Bronet' },
+  { id: 'rule_am', categoryId: 'cat_pulsa_data', subCategory: 'Axis', matchType: 'prefix', pattern: 'AM', note: 'Paket Data Axis Mini/Aigo' },
+  { id: 'rule_hdtf', categoryId: 'cat_pulsa_data', subCategory: 'Telkomsel', matchType: 'prefix', pattern: 'HDTF', note: 'Paket Data/Telpon Telkomsel' },
+  { id: 'rule_maxd', categoryId: 'cat_pulsa_data', subCategory: 'Telkomsel', matchType: 'prefix', pattern: 'MAXD', note: 'Paket Telkomsel DigiMax (MAXD*)' },
+  { id: 'rule_s', categoryId: 'cat_pulsa_data', subCategory: 'Telkomsel', matchType: 'prefix', pattern: 'S', note: 'Pulsa Reguler Telkomsel (S*)' },
+  { id: 'rule_i', categoryId: 'cat_pulsa_data', subCategory: 'Indosat Ooredoo', matchType: 'prefix', pattern: 'I', note: 'Pulsa & Data Indosat (I*)' },
+  { id: 'rule_x', categoryId: 'cat_pulsa_data', subCategory: 'XL Axiata', matchType: 'prefix', pattern: 'X', note: 'Pulsa & Data XL Axiata (X*)' },
+  { id: 'rule_t', categoryId: 'cat_pulsa_data', subCategory: 'Tri (3)', matchType: 'prefix', pattern: 'T', note: 'Pulsa & Data Tri (T*)' },
+];
+
+export const DEFAULT_OUTLET_GROUPS = [
+  {
+    id: 'out_plc',
+    name: 'Kategori Outlet Cabang PLC',
+    shortName: 'Kategori PLC',
+    type: 'CABANG_PLC',
+    color: '#6366f1',
+    description: 'Seluruh jaringan 41 Outlet Cabang PLC (Reguler, ALFA, BK, PD/ASBER/BAKSAR/CIKADUT, CL & PC).',
+    order: 1,
+  },
+  {
+    id: 'out_kbb',
+    name: 'Kategori Outlet Cabang KBB',
+    shortName: 'Kategori KBB',
+    type: 'CABANG_KBB',
+    color: '#10b981',
+    description: 'Jaringan 4 Outlet Cabang wilayah Bandung Barat (KBB Rawa 2, KBB Permata, KBB Kalapa, KBB Tanimulya).',
+    order: 2,
+  },
+];
+

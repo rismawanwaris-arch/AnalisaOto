@@ -1,0 +1,42 @@
+name: analisa-oto-zimaos
+
+services:
+  analisa-oto:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: analisa-oto-zimaos:latest
+    container_name: analisa-oto-zimaos
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATA_DIR=/app/data
+      - TZ=Asia/Jakarta
+      # Keamanan Login & CORS (Ambil dari file .env lokal, jangan tulis password asli di GitHub)
+      - ADMIN_USER=${ADMIN_USER:-admin}
+      - ADMIN_PASS=${ADMIN_PASS:-}
+      - SESSION_SECRET=${SESSION_SECRET:-}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - TRUST_PROXY=${TRUST_PROXY:-0}
+      - ENABLE_DEMO_TOOLS=${ENABLE_DEMO_TOOLS:-false}
+    volumes:
+      - ./data:/app/data
+
+x-casaos:
+  architectures:
+    - amd64
+    - arm64
+  main: analisa-oto
+  author: AnalisaOto Private Edition
+  category: Finance & Business Analytics
+  description:
+    en_us: "Private Daily Transaction Analysis & Day-over-Day (DoD) Comparison Dashboard for Pulsa, E-Wallet & PPOB Server with Adaptive Modular Category Rules."
+    id_id: "Dashboard Privat Analisis & Komparasi Transaksi Harian (DoD) Server Pulsa, E-Wallet & PPOB dengan Mesin Kategori Modular."
+  title:
+    en_us: "AnalisaOto Dashboard (ZimaOS)"
+  port_map: "3000"
+  scheme: http
+  index: /
