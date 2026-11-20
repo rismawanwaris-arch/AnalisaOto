@@ -24,6 +24,8 @@ ENV NODE_ENV=production
 ENV PORT=8070
 ENV DATA_DIR=/app/data
 
+RUN apk add --no-cache su-exec
+
 COPY package.json package-lock.json* ./
 RUN npm install --omit=dev && npm cache clean --force
 
@@ -32,10 +34,8 @@ COPY server ./server
 
 RUN mkdir -p /app/data /app/sample-data && chown -R node:node /app
 
-USER node
-
 VOLUME ["/app/data"]
 
 EXPOSE 8070
 
-CMD ["node", "server/index.js"]
+CMD ["sh", "-c", "chown -R node:node /app/data && exec su-exec node node server/index.js"]
