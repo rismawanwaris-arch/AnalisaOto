@@ -9,10 +9,10 @@ services:
     container_name: analisa-oto-zimaos
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "8070:8070"
     environment:
       - NODE_ENV=production
-      - PORT=3000
+      - PORT=8070
       - DATA_DIR=/app/data
       - TZ=Asia/Jakarta
       # Keamanan Login & CORS (Ambil dari file .env lokal, jangan tulis password asli di GitHub)
@@ -37,6 +37,6 @@ x-casaos:
     id_id: "Dashboard Privat Analisis & Komparasi Transaksi Harian (DoD) Server Pulsa, E-Wallet & PPOB dengan Mesin Kategori Modular."
   title:
     en_us: "AnalisaOto Dashboard (ZimaOS)"
-  port_map: "3000"
+  port_map: "8070"
   scheme: http
   index: /

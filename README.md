@@ -36,10 +36,10 @@ npm install
 npm run build
 npm start
 ```
-Akses aplikasi di: `http://localhost:3000`
+Akses aplikasi di: `http://localhost:8070`
 
 ### 2. Deployment di ZimaOS / CasaOS (Docker Compose)
 ```bash
 docker compose up -d --build
 ```
-Atau impor langsung file `docker-compose.yml` melalui **ZimaOS App Store -> Custom Install -> Import Docker Compose**, lalu akses `http://<ip-zimaos>:3000`.
+Atau impor langsung file `docker-compose.yml` melalui **ZimaOS App Store -> Custom Install -> Import Docker Compose**, lalu akses `http://<ip-zimaos>:8070`.

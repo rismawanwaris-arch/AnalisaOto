@@ -42,7 +42,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8070;
 const IS_PROD = process.env.NODE_ENV === 'production';
 const ENABLE_DEMO_TOOLS = process.env.ENABLE_DEMO_TOOLS === 'true' || !IS_PROD;
 
@@ -80,8 +80,8 @@ const envAllowedOrigins = (process.env.ALLOWED_ORIGINS || '')
 const defaultDevOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
-  'http://localhost:3000',
-  'http://127.0.0.1:3000',
+  'http://localhost:8070',
+  'http://127.0.0.1:8070',
 ];
 
 app.use(

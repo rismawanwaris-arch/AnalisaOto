@@ -21,7 +21,7 @@ FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8070
 ENV DATA_DIR=/app/data
 
 COPY package.json package-lock.json* ./
@@ -36,6 +36,6 @@ USER node
 
 VOLUME ["/app/data"]
 
-EXPOSE 3000
+EXPOSE 8070
 
 CMD ["node", "server/index.js"]
