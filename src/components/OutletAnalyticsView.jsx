@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Store,
   Building2,
@@ -985,213 +986,224 @@ export default function OutletAnalyticsView({
           '#6366f1'
         )}
 
-      {/* 360° DEEP-DIVE SINGLE OUTLET INSPECTION MODAL */}
-      {inspectedOutlet && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 overflow-y-auto animate-fade-in">
-          <div className="w-full max-w-5xl bg-slate-900 border border-indigo-500/40 rounded-2xl shadow-2xl overflow-hidden my-8 animate-scale-in">
-            {/* Modal Header */}
-            <div className="px-6 py-4 bg-gradient-to-r from-indigo-600/25 via-slate-900 to-slate-900 border-b border-indigo-500/30 flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300">
-                  <Store className="w-6 h-6" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="text-lg font-extrabold text-white">
-                      {inspectedOutlet.outletName}
-                    </h3>
-                    <span className="px-2 py-0.5 rounded font-mono text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                      ID: {inspectedOutlet.outletCode}
-                    </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300">
-                      {inspectedOutlet.subCluster || inspectedOutlet.groupName}
-                    </span>
+      {/* 360° DEEP-DIVE SINGLE OUTLET INSPECTION MODAL (Rendered via Portal on document.body to avoid parent transform containing-block bug) */}
+      {inspectedOutlet &&
+        createPortal(
+          <div
+            onClick={() => setInspectedOutlet(null)}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 animate-fade-in"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-5xl max-h-[90vh] flex flex-col bg-slate-900 border border-indigo-500/40 rounded-2xl shadow-2xl overflow-hidden animate-scale-in"
+            >
+              {/* Modal Header */}
+              <div className="px-6 py-4 bg-gradient-to-r from-indigo-600/25 via-slate-900 to-slate-900 border-b border-indigo-500/30 flex items-center justify-between gap-4 shrink-0">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300">
+                    <Store className="w-6 h-6" />
                   </div>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Analisa Mendalam 360° Cabang ({period?.d1Label} vs {period?.d2Label}) • Jam Puncak: {inspectedOutlet.peakHour}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setInspectedOutlet(null)}
-                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-6 space-y-6 max-h-[75vh] overflow-y-auto">
-              {/* Outlet KPI Strip */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 tabular-nums">
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                  <div className="text-[11px] text-slate-400 uppercase font-semibold">Omset Cabang D1</div>
-                  <div className="text-lg font-extrabold text-white mt-1">
-                    {formatRupiah(inspectedOutlet.omsetD1)}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">
-                    D2: {formatRupiah(inspectedOutlet.omsetD2)}
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg font-extrabold text-white">
+                        {inspectedOutlet.outletName}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded font-mono text-xs font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                        ID: {inspectedOutlet.outletCode}
+                      </span>
+                      <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-800 text-slate-300">
+                        {inspectedOutlet.subCluster || inspectedOutlet.groupName}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">
+                      Analisa Mendalam 360° Cabang ({period?.d1Label} vs {period?.d2Label}) • Jam Puncak: {inspectedOutlet.peakHour}
+                    </p>
                   </div>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                  <div className="text-[11px] text-slate-400 uppercase font-semibold">Selisih Omset (DoD)</div>
-                  <div
-                    className={`text-lg font-extrabold mt-1 ${
-                      inspectedOutlet.selisihRp >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                    }`}
-                  >
-                    {inspectedOutlet.selisihRp > 0 ? '+' : ''}
-                    {formatRupiah(inspectedOutlet.selisihRp)}
-                  </div>
-                  <div className="mt-1">
-                    {renderTrendBadge(inspectedOutlet.trend, inspectedOutlet.selisihPct)}
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                  <div className="text-[11px] text-slate-400 uppercase font-semibold">Transaksi Sukses</div>
-                  <div className="text-lg font-extrabold text-white mt-1">
-                    {formatNumber(inspectedOutlet.trxD1)} Trx
-                  </div>
-                  <div className="text-[11px] text-emerald-400 mt-1">
-                    Success Rate: {inspectedOutlet.successRateD1}% ({inspectedOutlet.gagalD1} Gagal)
-                  </div>
-                </div>
-                <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
-                  <div className="text-[11px] text-slate-400 uppercase font-semibold">Komisi & Jam Sibuk</div>
-                  <div className="text-lg font-extrabold text-amber-300 mt-1">
-                    {formatRupiah(inspectedOutlet.komisiD1)}
-                  </div>
-                  <div className="text-[11px] text-indigo-300 mt-1">
-                    Puncak: {inspectedOutlet.peakHour}
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setInspectedOutlet(null)}
+                  className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                >
+                  <X className="w-5 h-5" />
+                </button>
               </div>
 
-              {/* 5 Product Categories Breakdown in this Outlet */}
-              <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-indigo-400" />
-                  Performa 5 Pilar Kategori Produk di {inspectedOutlet.outletName}
-                </h4>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs tabular-nums">
-                    <thead>
-                      <tr className="border-b border-slate-800 text-slate-400">
-                        <th className="py-2 px-3">Kategori Produk</th>
-                        <th className="py-2 px-3 text-right">Omset D1</th>
-                        <th className="py-2 px-3 text-right">Omset D2</th>
-                        <th className="py-2 px-3 text-right">Selisih (Rp)</th>
-                        <th className="py-2 px-3 text-right">Trx D1</th>
-                        <th className="py-2 px-3 text-right">Porsi Cabang</th>
-                        <th className="py-2 px-3 text-center">Tren</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-800/60">
-                      {(inspectedOutlet.categoryBreakdown || []).map((cb) => (
-                        <tr key={cb.categoryId}>
-                          <td className="py-2.5 px-3 font-bold text-white flex items-center gap-2">
-                            <span
-                              className="w-2.5 h-2.5 rounded-full"
-                              style={{ backgroundColor: cb.color }}
-                            />
-                            {cb.name}
-                          </td>
-                          <td className="py-2.5 px-3 text-right font-bold text-white">
-                            {formatRupiah(cb.omsetD1)}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-slate-400">
-                            {formatRupiah(cb.omsetD2)}
-                          </td>
-                          <td
-                            className={`py-2.5 px-3 text-right font-semibold ${
-                              cb.selisihRp >= 0 ? 'text-emerald-400' : 'text-rose-400'
-                            }`}
-                          >
-                            {cb.selisihRp > 0 ? '+' : ''}
-                            {formatRupiah(cb.selisihRp)}
-                          </td>
-                          <td className="py-2.5 px-3 text-right text-slate-200">{cb.trxD1}</td>
-                          <td className="py-2.5 px-3 text-right font-mono text-indigo-300">
-                            {cb.sharePct}%
-                          </td>
-                          <td className="py-2.5 px-3 text-center">
-                            {renderTrendBadge(cb.trend, cb.selisihPct)}
-                          </td>
+              {/* Modal Body */}
+              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+                {/* Outlet KPI Strip */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5 tabular-nums">
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                    <div className="text-[11px] text-slate-400 uppercase font-semibold">Omset Cabang D1</div>
+                    <div className="text-lg font-extrabold text-white mt-1 whitespace-nowrap">
+                      {formatRupiah(inspectedOutlet.omsetD1)}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-1 whitespace-nowrap">
+                      D2: {formatRupiah(inspectedOutlet.omsetD2)}
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                    <div className="text-[11px] text-slate-400 uppercase font-semibold">Selisih Omset (DoD)</div>
+                    <div
+                      className={`text-lg font-extrabold mt-1 whitespace-nowrap ${
+                        inspectedOutlet.selisihRp >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                      }`}
+                    >
+                      {inspectedOutlet.selisihRp > 0 ? '+' : ''}
+                      {formatRupiah(inspectedOutlet.selisihRp)}
+                    </div>
+                    <div className="mt-1">
+                      {renderTrendBadge(inspectedOutlet.trend, inspectedOutlet.selisihPct)}
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                    <div className="text-[11px] text-slate-400 uppercase font-semibold">Transaksi Sukses</div>
+                    <div className="text-lg font-extrabold text-white mt-1">
+                      {formatNumber(inspectedOutlet.trxD1)} Trx
+                    </div>
+                    <div className="text-[11px] text-emerald-400 mt-1">
+                      Success Rate: {inspectedOutlet.successRateD1}% ({inspectedOutlet.gagalD1} Gagal)
+                    </div>
+                  </div>
+                  <div className="p-4 rounded-xl bg-slate-950 border border-slate-800">
+                    <div className="text-[11px] text-slate-400 uppercase font-semibold">Komisi & Jam Sibuk</div>
+                    <div className="text-lg font-extrabold text-amber-300 mt-1 whitespace-nowrap">
+                      {formatRupiah(inspectedOutlet.komisiD1)}
+                    </div>
+                    <div className="text-[11px] text-indigo-300 mt-1">
+                      Puncak: {inspectedOutlet.peakHour}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5 Product Categories Breakdown in this Outlet */}
+                <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-indigo-400" />
+                    Performa 5 Pilar Kategori Produk di {inspectedOutlet.outletName}
+                  </h4>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs tabular-nums">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 whitespace-nowrap">
+                          <th className="py-2 px-3">Kategori Produk</th>
+                          <th className="py-2 px-3 text-right">Omset D1</th>
+                          <th className="py-2 px-3 text-right">Omset D2</th>
+                          <th className="py-2 px-3 text-right">Selisih (Rp)</th>
+                          <th className="py-2 px-3 text-right">Trx D1</th>
+                          <th className="py-2 px-3 text-right">Porsi Cabang</th>
+                          <th className="py-2 px-3 text-center">Tren</th>
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* 24-Hour Activity Bar Chart + Top 12 Products in this Outlet */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Hourly Activity in this Outlet */}
-                <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-cyan-400" />
-                    Distribusi Transaksi 24 Jam di Cabang Ini
-                  </h4>
-                  <div className="flex items-end gap-1 h-40 pt-4 px-1">
-                    {(inspectedOutlet.hourlyComparison || []).map((h) => {
-                      const maxTrx = Math.max(
-                        1,
-                        ...inspectedOutlet.hourlyComparison.map((x) => Math.max(x.trxD1, x.trxD2))
-                      );
-                      const h1Pct = Math.round((h.trxD1 / maxTrx) * 100);
-                      return (
-                        <div
-                          key={h.hour}
-                          className="flex-1 flex flex-col items-center justify-end h-full group relative"
-                          title={`Jam ${h.label} — D1: ${h.trxD1} Trx (${formatRupiah(h.omsetD1)})`}
-                        >
-                          <div className="w-full bg-slate-900 rounded-t flex items-end justify-center h-28">
-                            <div
-                              className="w-full bg-indigo-500 group-hover:bg-cyan-400 rounded-t transition-all"
-                              style={{ height: `${Math.max(h.trxD1 > 0 ? 8 : 0, h1Pct)}%` }}
-                            />
-                          </div>
-                          <span className="text-[9px] font-mono text-slate-500 mt-1">
-                            {String(h.hour).padStart(2, '0')}
-                          </span>
-                        </div>
-                      );
-                    })}
+                      </thead>
+                      <tbody className="divide-y divide-slate-800/60">
+                        {(inspectedOutlet.categoryBreakdown || []).map((cb) => (
+                          <tr key={cb.categoryId}>
+                            <td className="py-2.5 px-3 font-bold text-white">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="w-2.5 h-2.5 rounded-full shrink-0"
+                                  style={{ backgroundColor: cb.color }}
+                                />
+                                <span>{cb.name}</span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 text-right font-bold text-white whitespace-nowrap">
+                              {formatRupiah(cb.omsetD1)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-400 whitespace-nowrap">
+                              {formatRupiah(cb.omsetD2)}
+                            </td>
+                            <td
+                              className={`py-2.5 px-3 text-right font-semibold whitespace-nowrap ${
+                                cb.selisihRp >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                              }`}
+                            >
+                              {cb.selisihRp > 0 ? '+' : ''}
+                              {formatRupiah(cb.selisihRp)}
+                            </td>
+                            <td className="py-2.5 px-3 text-right text-slate-200 whitespace-nowrap">{cb.trxD1}</td>
+                            <td className="py-2.5 px-3 text-right font-mono text-indigo-300 whitespace-nowrap">
+                              {cb.sharePct}%
+                            </td>
+                            <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                              {renderTrendBadge(cb.trend, cb.selisihPct)}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
 
-                {/* Top Products in this Outlet */}
-                <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
-                    <Package className="w-4 h-4 text-emerald-400" />
-                    Top Produk Terlaris di {inspectedOutlet.outletName}
-                  </h4>
-                  <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1 tabular-nums">
-                    {(inspectedOutlet.topProducts || []).map((p, idx) => (
-                      <div
-                        key={p.produk}
-                        className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono text-slate-500 w-4">
-                            {idx + 1}.
-                          </span>
-                          <span className="font-mono font-bold text-indigo-300">{p.produk}</span>
-                          <span className="text-[11px] text-slate-400">({p.subCategory})</span>
+                {/* 24-Hour Activity Bar Chart + Top 12 Products in this Outlet */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  {/* Hourly Activity in this Outlet */}
+                  <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-cyan-400" />
+                      Distribusi Transaksi 24 Jam di Cabang Ini
+                    </h4>
+                    <div className="flex items-end gap-1 h-40 pt-4 px-1">
+                      {(inspectedOutlet.hourlyComparison || []).map((h) => {
+                        const maxTrx = Math.max(
+                          1,
+                          ...inspectedOutlet.hourlyComparison.map((x) => Math.max(x.trxD1, x.trxD2))
+                        );
+                        const h1Pct = Math.round((h.trxD1 / maxTrx) * 100);
+                        return (
+                          <div
+                            key={h.hour}
+                            className="flex-1 flex flex-col items-center justify-end h-full group relative"
+                            title={`Jam ${h.label} — D1: ${h.trxD1} Trx (${formatRupiah(h.omsetD1)})`}
+                          >
+                            <div className="w-full bg-slate-900 rounded-t flex items-end justify-center h-28">
+                              <div
+                                className="w-full bg-indigo-500 group-hover:bg-cyan-400 rounded-t transition-all"
+                                style={{ height: `${Math.max(h.trxD1 > 0 ? 8 : 0, h1Pct)}%` }}
+                              />
+                            </div>
+                            <span className="text-[9px] font-mono text-slate-500 mt-1">
+                              {String(h.hour).padStart(2, '0')}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Top Products in this Outlet */}
+                  <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3 flex items-center gap-2">
+                      <Package className="w-4 h-4 text-emerald-400" />
+                      Top Produk Terlaris di {inspectedOutlet.outletName}
+                    </h4>
+                    <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1 tabular-nums">
+                      {(inspectedOutlet.topProducts || []).map((p, idx) => (
+                        <div
+                          key={p.produk}
+                          className="flex items-center justify-between text-xs py-1.5 px-2.5 rounded-lg bg-slate-900/80 border border-slate-800/80"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[10px] font-mono text-slate-500 w-4 shrink-0">
+                              {idx + 1}.
+                            </span>
+                            <span className="font-mono font-bold text-indigo-300 shrink-0">{p.produk}</span>
+                            <span className="text-[11px] text-slate-400 truncate">({p.subCategory})</span>
+                          </div>
+                          <div className="text-right shrink-0 whitespace-nowrap ml-2">
+                            <span className="font-bold text-white">{formatRupiah(p.omsetD1)}</span>
+                            <span className="text-[10px] text-slate-400 ml-2">{p.trxD1} Trx</span>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="font-bold text-white">{formatRupiah(p.omsetD1)}</span>
-                          <span className="text-[10px] text-slate-400 ml-2">{p.trxD1} Trx</span>
-                        </div>
-                      </div>
-                    ))}
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

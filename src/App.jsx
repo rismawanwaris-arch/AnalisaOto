@@ -1216,6 +1216,7 @@ export default function App() {
                     period={analytics?.period || {}}
                     totalOmsetD1={analytics?.kpi?.omset?.d1 || 0}
                     totalTrxD1={analytics?.kpi?.transaksiSukses?.d1 || 0}
+                    outletAnalytics={analytics?.outletAnalytics || {}}
                   />
                   <SideBySideCategoryTable
                     categoryComparison={analytics?.categoryComparison || []}
@@ -1270,6 +1271,7 @@ export default function App() {
                 period={analytics?.period || {}}
                 totalOmsetD1={analytics?.kpi?.omset?.d1 || 0}
                 totalTrxD1={analytics?.kpi?.transaksiSukses?.d1 || 0}
+                outletAnalytics={analytics?.outletAnalytics || {}}
               />
               <GrowthAndFailureSections
                 growth={analytics?.growth || {}}

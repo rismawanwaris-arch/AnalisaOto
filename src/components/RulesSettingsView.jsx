@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Settings,
   BookOpen,
@@ -785,9 +786,10 @@ export default function RulesSettingsView({
       )}
 
       {/* Modal Override Kategori Produk Spesifik */}
-      {overrideModalProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="w-full max-w-md bg-slate-900 border border-indigo-500/40 rounded-2xl p-6 shadow-2xl animate-scale-in">
+      {overrideModalProduct &&
+        createPortal(
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-slate-900 border border-indigo-500/40 rounded-2xl p-6 shadow-2xl animate-scale-in">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <h3 className="text-base font-bold text-white">
                 Ubah Kategori Produk:{' '}
@@ -883,7 +885,8 @@ export default function RulesSettingsView({
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

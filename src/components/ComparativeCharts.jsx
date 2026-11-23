@@ -7,6 +7,7 @@ import {
   TrendingDown,
   Zap,
   Eye,
+  Store,
 } from 'lucide-react';
 import {
   formatRupiah,
@@ -22,6 +23,7 @@ export default function ComparativeCharts({
   period = {},
   totalOmsetD1 = 0,
   totalTrxD1 = 0,
+  outletAnalytics = {},
 }) {
   // 1. State for Side-by-Side Bar Chart
   const [barMetric, setBarMetric] = useState('omset'); // 'omset' | 'trx' | 'laba'
@@ -34,6 +36,7 @@ export default function ComparativeCharts({
   // 3. State for Hourly Distribution Curve
   const [hourlyMetric, setHourlyMetric] = useState('trx'); // 'trx' | 'omset'
   const [hoveredHour, setHoveredHour] = useState(null);
+  const [selectedOutletScope, setSelectedOutletScope] = useState('ALL'); // 'ALL' | 'GROUP:out_plc' | 'GROUP:out_kbb' | 'OUTLET:<name>'
 
   // Filtered categories for bar chart
   const barCategories = useMemo(() => {
@@ -82,6 +85,54 @@ export default function ComparativeCharts({
     return donutData.segments.find((s) => s.categoryId === hoveredCatId) || null;
   }, [hoveredCatId, donutData]);
 
+  const allOutlets = outletAnalytics?.allOutlets || [];
+  const outletGroups = outletAnalytics?.outletGroupComparison || [];
+
+  const displayedHourly = useMemo(() => {
+    if (selectedOutletScope === 'ALL') {
+      return hourlyComparison;
+    }
+    if (selectedOutletScope.startsWith('GROUP:')) {
+      const targetGroupId = selectedOutletScope.slice(6);
+      const groupOutlets = allOutlets.filter((o) => o.groupId === targetGroupId);
+      const buckets = Array.from({ length: 24 }, (_, hr) => ({
+        hour: hr,
+        label: `${String(hr).padStart(2, '0')}:00`,
+        trxD1: 0,
+        trxD2: 0,
+        omsetD1: 0,
+        omsetD2: 0,
+      }));
+      for (const o of groupOutlets) {
+        for (const h of o.hourlyComparison || []) {
+          if (buckets[h.hour]) {
+            buckets[h.hour].trxD1 += h.trxD1 || 0;
+            buckets[h.hour].trxD2 += h.trxD2 || 0;
+            buckets[h.hour].omsetD1 += h.omsetD1 || 0;
+            buckets[h.hour].omsetD2 += h.omsetD2 || 0;
+          }
+        }
+      }
+      return buckets;
+    }
+    if (selectedOutletScope.startsWith('OUTLET:')) {
+      const targetName = selectedOutletScope.slice(7);
+      const found = allOutlets.find((o) => o.outletName === targetName);
+      if (found?.hourlyComparison) {
+        return found.hourlyComparison;
+      }
+    }
+    return hourlyComparison;
+  }, [selectedOutletScope, hourlyComparison, allOutlets]);
+
+  const displayedPeakHour = useMemo(() => {
+    if (selectedOutletScope === 'ALL' && peakHours?.byTrxD1) {
+      return peakHours.byTrxD1;
+    }
+    if (!displayedHourly || displayedHourly.length === 0) return null;
+    return [...displayedHourly].sort((a, b) => b.trxD1 - a.trxD1 || b.omsetD1 - a.omsetD1)[0];
+  }, [selectedOutletScope, peakHours, displayedHourly]);
+
   // Hourly Chart SVG Geometry
   const hourlyChartGeometry = useMemo(() => {
     const width = 860;
@@ -94,7 +145,7 @@ export default function ComparativeCharts({
     const innerH = height - padTop - padBottom;
 
     let maxVal = 10;
-    for (const h of hourlyComparison) {
+    for (const h of displayedHourly) {
       const v1 = hourlyMetric === 'trx' ? h.trxD1 : h.omsetD1;
       const v2 = hourlyMetric === 'trx' ? h.trxD2 : h.omsetD2;
       if (v1 > maxVal) maxVal = v1;
@@ -102,14 +153,14 @@ export default function ComparativeCharts({
     }
     maxVal = Math.ceil(maxVal * 1.12);
 
-    const pointsD1 = hourlyComparison.map((h, i) => {
+    const pointsD1 = displayedHourly.map((h, i) => {
       const val = hourlyMetric === 'trx' ? h.trxD1 : h.omsetD1;
       const x = padLeft + (i / 23) * innerW;
       const y = padTop + innerH - (val / maxVal) * innerH;
       return { x, y, val, hour: h.hour, label: h.label, raw: h };
     });
 
-    const pointsD2 = hourlyComparison.map((h, i) => {
+    const pointsD2 = displayedHourly.map((h, i) => {
       const val = hourlyMetric === 'trx' ? h.trxD2 : h.omsetD2;
       const x = padLeft + (i / 23) * innerW;
       const y = padTop + innerH - (val / maxVal) * innerH;
@@ -154,14 +205,14 @@ export default function ComparativeCharts({
       lineD2,
       areaD1,
     };
-  }, [hourlyComparison, hourlyMetric]);
+  }, [displayedHourly, hourlyMetric]);
 
   const activeHourData = useMemo(() => {
-    if (hoveredHour !== null && hourlyComparison[hoveredHour]) {
-      return hourlyComparison[hoveredHour];
+    if (hoveredHour !== null && displayedHourly[hoveredHour]) {
+      return displayedHourly[hoveredHour];
     }
-    return peakHours?.byTrxD1 || hourlyComparison[9] || null;
-  }, [hoveredHour, hourlyComparison, peakHours]);
+    return displayedPeakHour || displayedHourly[9] || null;
+  }, [hoveredHour, displayedHourly, displayedPeakHour]);
 
   return (
     <div className="space-y-6">
@@ -479,12 +530,51 @@ export default function ComparativeCharts({
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            {/* Branch / Group Selector for Busy Hours */}
+            {allOutlets.length > 0 && (
+              <div className="flex items-center gap-2 bg-slate-950/90 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
+                <Store className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                <select
+                  value={selectedOutletScope}
+                  onChange={(e) => {
+                    setSelectedOutletScope(e.target.value);
+                    setHoveredHour(null);
+                  }}
+                  className="bg-transparent font-bold text-white focus:outline-none cursor-pointer max-w-[240px]"
+                >
+                  <option value="ALL" className="bg-slate-900 text-white">
+                    Semua Transaksi (Total Server)
+                  </option>
+                  {outletGroups.map((g) => (
+                    <option
+                      key={g.groupId}
+                      value={`GROUP:${g.groupId}`}
+                      className="bg-slate-900 text-indigo-300 font-bold"
+                    >
+                      {g.name} ({g.outletCount} Cabang)
+                    </option>
+                  ))}
+                  <optgroup label="Pilih Cabang Tertentu (PLC & KBB)" className="bg-slate-900 text-slate-400">
+                    {allOutlets.map((o) => (
+                      <option
+                        key={o.outletName}
+                        value={`OUTLET:${o.outletName}`}
+                        className="bg-slate-900 text-white"
+                      >
+                        {o.outletName} ({o.outletCode}) — {o.trxD1} Trx
+                      </option>
+                    ))}
+                  </optgroup>
+                </select>
+              </div>
+            )}
+
             {/* Peak Hour Badges */}
             <div className="flex items-center gap-2 bg-slate-950/80 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
               <Zap className="w-3.5 h-3.5 text-amber-400" />
               <span className="text-slate-400">Jam Puncak D1:</span>
               <span className="font-mono font-bold text-amber-300">
-                {peakHours?.byTrxD1?.label || '-'} ({formatNumber(peakHours?.byTrxD1?.trxD1 || 0)} Trx)
+                {displayedPeakHour?.label || '-'} ({formatNumber(displayedPeakHour?.trxD1 || 0)} Trx)
               </span>
             </div>
 
@@ -537,10 +627,12 @@ export default function ComparativeCharts({
                 <strong className="text-white">{formatRupiah(activeHourData.omsetD1)}</strong>
                 <span className="text-slate-500"> / {formatCompactRupiah(activeHourData.omsetD2)}</span>
               </div>
-              <div>
-                <span className="text-slate-400">Laba Jam Ini: </span>
-                <strong className="text-indigo-300">{formatRupiah(activeHourData.labaD1)}</strong>
-              </div>
+              {selectedOutletScope === 'ALL' && (
+                <div>
+                  <span className="text-slate-400">Laba Jam Ini: </span>
+                  <strong className="text-indigo-300">{formatRupiah(activeHourData.labaD1)}</strong>
+                </div>
+              )}
             </div>
           </div>
         )}
