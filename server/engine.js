@@ -679,6 +679,9 @@ export function computeComparisonAnalytics({
     let omset = 0;
     let hrgBeli = 0;
     let laba = 0;
+    let labaPlc = 0;
+    let labaKbb = 0;
+    let labaAgen = 0;
     let komisi = 0;
     let komisiPlc = 0;
     let komisiKbb = 0;
@@ -859,10 +862,13 @@ export function computeComparisonAnalytics({
         rEntry.komisi += tx.komisi;
         if (outletEval.groupId === 'out_plc') {
           komisiPlc += tx.komisi;
+          labaPlc += tx.laba;
         } else if (outletEval.groupId === 'out_kbb') {
           komisiKbb += tx.komisi;
+          labaKbb += tx.laba;
         } else {
           komisiAgen += tx.komisi;
+          labaAgen += tx.laba;
         }
         rEntry.hourly[h].trx++;
         rEntry.hourly[h].omset += tx.hrgJual;
@@ -987,6 +993,9 @@ export function computeComparisonAnalytics({
       omset,
       hrgBeli,
       laba,
+      labaPlc,
+      labaKbb,
+      labaAgen,
       komisi,
       komisiPlc,
       komisiKbb,
@@ -1030,6 +1039,26 @@ export function computeComparisonAnalytics({
       d1: aggD1.laba,
       d2: aggD2.laba,
       ...calcDelta(aggD1.laba, aggD2.laba),
+      breakdown: {
+        plc: {
+          d1: aggD1.labaPlc,
+          d2: aggD2.labaPlc,
+          sharePct: aggD1.laba !== 0 ? Number(((aggD1.labaPlc / aggD1.laba) * 100).toFixed(1)) : 0,
+          ...calcDelta(aggD1.labaPlc, aggD2.labaPlc),
+        },
+        kbb: {
+          d1: aggD1.labaKbb,
+          d2: aggD2.labaKbb,
+          sharePct: aggD1.laba !== 0 ? Number(((aggD1.labaKbb / aggD1.laba) * 100).toFixed(1)) : 0,
+          ...calcDelta(aggD1.labaKbb, aggD2.labaKbb),
+        },
+        agen: {
+          d1: aggD1.labaAgen,
+          d2: aggD2.labaAgen,
+          sharePct: aggD1.laba !== 0 ? Number(((aggD1.labaAgen / aggD1.laba) * 100).toFixed(1)) : 0,
+          ...calcDelta(aggD1.labaAgen, aggD2.labaAgen),
+        },
+      },
     },
     komisiReseller: {
       d1: aggD1.komisi,
@@ -1664,7 +1693,7 @@ function generateWhatsAppSummary({
     `*=== PERFORMA UTAMA (DoD) ===*`,
     `💰 Omset Penjualan: ${formatRp(kpi.omset.d1)} (${omsetIcon} ${omsetSign}${formatRp(Math.abs(kpi.omset.diff))} / ${omsetPctSign}${kpi.omset.pct}%)`,
     `📦 Trx Sukses: ${formatNum(kpi.transaksiSukses.d1)} Trx (${kpi.transaksiSukses.successRateD1}%)`,
-    `💵 Laba Server: ${formatRp(kpi.labaBersih.d1)} (${labaSign}${formatRp(Math.abs(kpi.labaBersih.diff))} / ${labaPctSign}${kpi.labaBersih.pct}%)`,
+    `💵 Laba Server: ${formatRp(kpi.labaBersih.d1)} (${labaSign}${formatRp(Math.abs(kpi.labaBersih.diff))} / ${labaPctSign}${kpi.labaBersih.pct}%) — PLC: ${formatRp(kpi.labaBersih?.breakdown?.plc?.d1 || 0)} | KBB: ${formatRp(kpi.labaBersih?.breakdown?.kbb?.d1 || 0)} | Agen: ${formatRp(kpi.labaBersih?.breakdown?.agen?.d1 || 0)}`,
     `👥 Komisi Reseller: ${formatRp(kpi.komisiReseller.d1)} (PLC: ${formatRp(kpi.komisiReseller?.breakdown?.plc?.d1 || 0)} | KBB: ${formatRp(kpi.komisiReseller?.breakdown?.kbb?.d1 || 0)} | Agen: ${formatRp(kpi.komisiReseller?.breakdown?.agen?.d1 || 0)})`,
     `⏰ Jam Puncak Trx: Pukul ${peakHourByTrxD1?.label || '-'} (${formatNum(peakHourByTrxD1?.trxD1 || 0)} Trx)`,
     ``,

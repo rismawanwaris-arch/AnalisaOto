@@ -60,6 +60,7 @@ export default function ExecutiveKpiCards({ kpi = {}, period = {} }) {
       deltaPct: formatPercent(kpi?.labaBersih?.pct || 0),
       trend: kpi?.labaBersih?.trend || 'flat',
       subtitle: `Laba D2 (${period?.d2Label}): ${formatRupiah(kpi?.labaBersih?.d2 || 0)}`,
+      outletBreakdown: kpi?.labaBersih?.breakdown || null,
       icon: Coins,
       accent: 'from-cyan-500/20 to-cyan-500/5 border-cyan-500/30 text-cyan-400',
       badgeGlow: 'shadow-cyan-950/50',
@@ -74,7 +75,7 @@ export default function ExecutiveKpiCards({ kpi = {}, period = {} }) {
       deltaPct: formatPercent(kpi?.komisiReseller?.pct || 0),
       trend: kpi?.komisiReseller?.trend || 'flat',
       subtitle: `Komisi D2 (${period?.d2Label}): ${formatRupiah(kpi?.komisiReseller?.d2 || 0)}`,
-      komisiBreakdown: kpi?.komisiReseller?.breakdown || null,
+      outletBreakdown: kpi?.komisiReseller?.breakdown || null,
       icon: Users,
       accent: 'from-amber-500/20 to-amber-500/5 border-amber-500/30 text-amber-400',
       badgeGlow: 'shadow-amber-950/50',
@@ -119,19 +120,19 @@ export default function ExecutiveKpiCards({ kpi = {}, period = {} }) {
               </div>
             )}
 
-            {card.komisiBreakdown && (
+            {card.outletBreakdown && (
               <div className="mt-2.5 space-y-1 text-[11px] tabular-nums">
                 <div className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-slate-950/80 border border-indigo-500/25">
-                  <span className="font-bold text-indigo-300">PLC ({card.komisiBreakdown.plc?.sharePct || 0}%)</span>
-                  <span className="font-bold text-white whitespace-nowrap">{formatRupiah(card.komisiBreakdown.plc?.d1 || 0)}</span>
+                  <span className="font-bold text-indigo-300">PLC ({card.outletBreakdown.plc?.sharePct || 0}%)</span>
+                  <span className="font-bold text-white whitespace-nowrap">{formatRupiah(card.outletBreakdown.plc?.d1 || 0)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-slate-950/80 border border-emerald-500/25">
-                  <span className="font-bold text-emerald-300">KBB ({card.komisiBreakdown.kbb?.sharePct || 0}%)</span>
-                  <span className="font-bold text-white whitespace-nowrap">{formatRupiah(card.komisiBreakdown.kbb?.d1 || 0)}</span>
+                  <span className="font-bold text-emerald-300">KBB ({card.outletBreakdown.kbb?.sharePct || 0}%)</span>
+                  <span className="font-bold text-white whitespace-nowrap">{formatRupiah(card.outletBreakdown.kbb?.d1 || 0)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-2 px-2 py-1 rounded-lg bg-slate-950/80 border border-amber-500/25">
-                  <span className="font-bold text-amber-300">Agen ({card.komisiBreakdown.agen?.sharePct || 0}%)</span>
-                  <span className="font-bold text-white whitespace-nowrap">{formatRupiah(card.komisiBreakdown.agen?.d1 || 0)}</span>
+                  <span className="font-bold text-amber-300">Agen ({card.outletBreakdown.agen?.sharePct || 0}%)</span>
+                  <span className="font-bold text-white whitespace-nowrap">{formatRupiah(card.outletBreakdown.agen?.d1 || 0)}</span>
                 </div>
               </div>
             )}
