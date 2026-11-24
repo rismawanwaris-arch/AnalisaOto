@@ -329,10 +329,10 @@ export function suggestRuleForProduct(productCode, moduleName) {
 
 function toNumber(val) {
   if (val === null || val === undefined || val === '' || val === '<null>') return 0;
-  if (typeof val === 'number') return Number.isFinite(val) ? Math.round(val) : 0;
+  if (typeof val === 'number') return Number.isFinite(val) ? val : 0;
   const cleaned = String(val).replace(/[^0-9.-]/g, '');
   const parsed = parseFloat(cleaned);
-  return Number.isFinite(parsed) ? Math.round(parsed) : 0;
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function parseTimestamp(raw) {
