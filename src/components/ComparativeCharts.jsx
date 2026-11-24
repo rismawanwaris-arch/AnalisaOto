@@ -409,8 +409,8 @@ export default function ComparativeCharts({
             </div>
 
             {/* Interactive SVG Donut Chart */}
-            <div className="my-5 flex flex-col sm:flex-row items-center justify-center gap-6">
-              <div className="relative w-48 h-48 shrink-0 flex items-center justify-center">
+            <div className="my-5 px-2 flex flex-col 2xl:flex-row items-center justify-center gap-5">
+              <div className="relative w-44 h-44 shrink-0 flex items-center justify-center">
                 <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90 transform">
                   <circle
                     cx="60"
@@ -419,6 +419,7 @@ export default function ComparativeCharts({
                     fill="transparent"
                     stroke="#1e293b"
                     strokeWidth="16"
+                    className="chart-track-stroke"
                   />
                   {donutData.segments.map((seg) => {
                     const circumference = 2 * Math.PI * 46;
@@ -668,6 +669,7 @@ export default function ComparativeCharts({
                       stroke="#1e293b"
                       strokeDasharray={ratio === 0 ? '' : '4 4'}
                       strokeWidth="1"
+                      className="chart-grid-stroke"
                     />
                     <text
                       x={hourlyChartGeometry.padLeft - 8}

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { Lock, User, Eye, EyeOff, ShieldCheck, AlertTriangle, LogIn } from 'lucide-react';
+import { Lock, User, Eye, EyeOff, ShieldCheck, AlertTriangle, LogIn, Sun, Moon } from 'lucide-react';
 
-export default function LoginView({ onLoginSuccess, usingDefaultPassword }) {
+export default function LoginView({ onLoginSuccess, usingDefaultPassword, theme = 'dark', onToggleTheme }) {
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -34,6 +34,28 @@ export default function LoginView({ onLoginSuccess, usingDefaultPassword }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Theme Toggle */}
+      {onToggleTheme && (
+        <button
+          type="button"
+          onClick={onToggleTheme}
+          className="fixed top-4 right-4 z-20 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 shadow-lg transition-colors"
+          title={theme === 'dark' ? 'Ganti ke Light Mode' : 'Ganti ke Dark Mode'}
+        >
+          {theme === 'dark' ? (
+            <>
+              <Sun className="w-3.5 h-3.5 text-amber-400" />
+              <span>Light Mode</span>
+            </>
+          ) : (
+            <>
+              <Moon className="w-3.5 h-3.5 text-indigo-400" />
+              <span>Dark Mode</span>
+            </>
+          )}
+        </button>
+      )}
+
       {/* Subtle Ambient Background */}
       <div className="absolute -top-32 -left-32 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-emerald-600/10 rounded-full blur-3xl pointer-events-none" />

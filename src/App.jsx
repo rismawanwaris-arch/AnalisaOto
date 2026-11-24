@@ -27,6 +27,8 @@ import {
   Lock,
   LogOut,
   Users,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import ExecutiveKpiCards from './components/ExecutiveKpiCards.jsx';
 import ComparativeCharts from './components/ComparativeCharts.jsx';
@@ -49,8 +51,17 @@ import {
   formatPercent,
 } from './utils/format.js';
 import { apiFetch, registerUnauthorizedHandler } from './utils/api.js';
+import { getInitialTheme, applyTheme } from './utils/theme.js';
 
 export default function App() {
+  const [theme, setTheme] = useState(() => getInitialTheme());
+  useEffect(() => {
+    applyTheme(theme);
+  }, [theme]);
+  const toggleTheme = useCallback(() => {
+    setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+  }, []);
+
   const [authState, setAuthState] = useState({
     checking: true,
     authenticated: false,
@@ -406,6 +417,8 @@ export default function App() {
   if (!authState.authenticated) {
     return (
       <LoginView
+        theme={theme}
+        onToggleTheme={toggleTheme}
         usingDefaultPassword={authState.usingDefaultPassword}
         onLoginSuccess={(loginData) => {
           setAuthState((prev) => ({
@@ -581,6 +594,14 @@ export default function App() {
             <div className="flex flex-col items-center gap-2">
               <button
                 type="button"
+                onClick={toggleTheme}
+                className="p-2 rounded-lg bg-slate-800/70 hover:bg-slate-700 text-amber-400"
+                title={theme === 'dark' ? 'Ganti ke Light Mode' : 'Ganti ke Dark Mode'}
+              >
+                {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+              </button>
+              <button
+                type="button"
                 onClick={() => setChangePasswordOpen(true)}
                 className="p-2 rounded-lg bg-slate-800/70 hover:bg-slate-700 text-emerald-400"
                 title="Keamanan Akun & Ubah Password"
@@ -630,6 +651,24 @@ export default function App() {
                   Kunci / Keluar
                 </button>
               </div>
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-800/70 hover:bg-slate-700 text-slate-200 text-[11px] font-bold border border-slate-700 transition-colors"
+                title="Ubah Tema Tampilan (Dark / Light)"
+              >
+                <span className="flex items-center gap-1.5">
+                  {theme === 'dark' ? (
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  ) : (
+                    <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                  )}
+                  <span>Tema Tampilan</span>
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-slate-900 border border-slate-700 text-[10px] font-extrabold uppercase tracking-wide">
+                  {theme === 'dark' ? 'Dark' : 'Light'}
+                </span>
+              </button>
             </>
           )}
         </div>
@@ -643,13 +682,23 @@ export default function App() {
           </div>
           <span className="font-bold text-white text-sm">AnalisaOto ZimaOS</span>
         </div>
-        <button
-          type="button"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 rounded-lg bg-slate-800 text-slate-200"
-        >
-          {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            className="p-2 rounded-lg bg-slate-800 text-slate-200"
+            title={theme === 'dark' ? 'Ganti ke Light Mode' : 'Ganti ke Dark Mode'}
+          >
+            {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-indigo-400" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-lg bg-slate-800 text-slate-200"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
+        </div>
       </div>
 
       {mobileMenuOpen && (
@@ -755,8 +804,26 @@ export default function App() {
               </div>
             </div>
 
-            {/* Right Action Buttons: One-Click WA Report & Preview */}
+            {/* Right Action Buttons: Theme Toggle, One-Click WA Report & Preview */}
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 border border-slate-700 text-xs font-bold transition-colors"
+                title={theme === 'dark' ? 'Ganti ke Light Mode' : 'Ganti ke Dark Mode'}
+              >
+                {theme === 'dark' ? (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                    <span className="hidden sm:inline">Light</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-indigo-400" />
+                    <span className="hidden sm:inline">Dark</span>
+                  </>
+                )}
+              </button>
               <button
                 type="button"
                 onClick={handleQuickCopyWA}

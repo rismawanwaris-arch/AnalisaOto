@@ -171,16 +171,16 @@ export default function WhatsAppSummaryModal({
             </button>
           </div>
 
-          <div className="relative rounded-xl bg-[#0b141a] border border-emerald-900/50 p-4 shadow-inner">
+          <div className="wa-preview-box relative rounded-xl bg-[#0b141a] border border-emerald-900/50 p-4 shadow-inner">
             <div className="text-[11px] font-semibold text-emerald-400 mb-2 flex items-center justify-between">
               <span>PREVIEW PESAN WHATSAPP OWNER / MANAJEMEN</span>
-              <span className="text-slate-500 font-mono">UTF-8 / WA Markdown</span>
+              <span className="text-slate-400 font-mono">UTF-8 / WA Markdown</span>
             </div>
             <textarea
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={15}
-              className="w-full bg-[#1f2c34] text-slate-100 font-mono text-xs leading-relaxed p-4 rounded-xl border border-emerald-500/20 focus:border-emerald-500 focus:outline-none resize-y"
+              className="wa-preview-inner w-full bg-[#1f2c34] text-slate-100 font-mono text-xs leading-relaxed p-4 rounded-xl border border-emerald-500/20 focus:border-emerald-500 focus:outline-none resize-y"
             />
           </div>
         </div>

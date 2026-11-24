@@ -5,6 +5,7 @@
 @layer base {
   body {
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   .tabular-nums {
@@ -14,27 +15,322 @@
 
 /* Custom sleek scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
-
 ::-webkit-scrollbar-track {
-  background: rgba(15, 23, 42, 0.6);
+  background: transparent;
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.7);
+  background: rgba(148, 163, 184, 0.25);
   border-radius: 9999px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.8);
+  background: rgba(148, 163, 184, 0.45);
 }
 
-/* Staggered entry animation delays */
+/* Animation utility delays */
 .stagger-1 { animation-delay: 40ms; }
 .stagger-2 { animation-delay: 80ms; }
 .stagger-3 { animation-delay: 120ms; }
 .stagger-4 { animation-delay: 160ms; }
 .stagger-5 { animation-delay: 200ms; }
 .stagger-6 { animation-delay: 240ms; }
+
+/* =========================================================
+   LIGHT MODE THEME OVERRIDES (html.light)
+   Maps dark-first Tailwind slate/accent utilities to crisp,
+   high-contrast light surfaces while preserving solid buttons.
+   ========================================================= */
+html.light {
+  color-scheme: light;
+}
+
+html.light ::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.32);
+}
+html.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(71, 85, 105, 0.55);
+}
+
+/* Base Surfaces */
+html.light body,
+html.light .bg-slate-950 {
+  background-color: #f1f5f9 !important;
+  color: #0f172a;
+}
+html.light .bg-slate-950\/95 { background-color: rgba(248, 250, 252, 0.96) !important; }
+html.light .bg-slate-950\/90 { background-color: rgba(248, 250, 252, 0.94) !important; }
+html.light .bg-slate-950\/85 { background-color: rgba(241, 245, 249, 0.92) !important; }
+html.light .bg-slate-950\/80 { background-color: rgba(241, 245, 249, 0.90) !important; }
+html.light .bg-slate-950\/75 { background-color: rgba(241, 245, 249, 0.88) !important; }
+html.light .bg-slate-950\/70 { background-color: rgba(241, 245, 249, 0.85) !important; }
+html.light .bg-slate-950\/60 { background-color: rgba(241, 245, 249, 0.80) !important; }
+html.light .bg-slate-950\/50 { background-color: rgba(241, 245, 249, 0.72) !important; }
+html.light .bg-slate-950\/40 { background-color: rgba(241, 245, 249, 0.65) !important; }
+
+html.light .bg-slate-900 { background-color: #ffffff !important; }
+html.light .bg-slate-900\/95 { background-color: rgba(255, 255, 255, 0.96) !important; }
+html.light .bg-slate-900\/90 { background-color: rgba(255, 255, 255, 0.94) !important; }
+html.light .bg-slate-900\/85 { background-color: rgba(255, 255, 255, 0.92) !important; }
+html.light .bg-slate-900\/80 { background-color: rgba(255, 255, 255, 0.90) !important; }
+html.light .bg-slate-900\/75 { background-color: rgba(255, 255, 255, 0.88) !important; }
+html.light .bg-slate-900\/70 { background-color: rgba(255, 255, 255, 0.85) !important; }
+html.light .bg-slate-900\/60 { background-color: rgba(255, 255, 255, 0.82) !important; }
+html.light .bg-slate-900\/50 { background-color: rgba(248, 250, 252, 0.9) !important; }
+html.light .bg-slate-900\/40 { background-color: rgba(248, 250, 252, 0.75) !important; }
+
+html.light .bg-slate-800 { background-color: #e2e8f0 !important; }
+html.light .bg-slate-800\/90 { background-color: rgba(226, 232, 240, 0.95) !important; }
+html.light .bg-slate-800\/80 { background-color: rgba(226, 232, 240, 0.85) !important; }
+html.light .bg-slate-800\/75 { background-color: rgba(241, 245, 249, 0.95) !important; }
+html.light .bg-slate-800\/70 { background-color: rgba(241, 245, 249, 0.9) !important; }
+html.light .bg-slate-800\/60 { background-color: rgba(241, 245, 249, 0.85) !important; }
+html.light .bg-slate-800\/50 { background-color: rgba(241, 245, 249, 0.75) !important; }
+html.light .bg-slate-800\/40 { background-color: rgba(241, 245, 249, 0.65) !important; }
+html.light .bg-slate-800\/30 { background-color: rgba(241, 245, 249, 0.55) !important; }
+
+html.light .hover\:bg-slate-950:hover { background-color: #e2e8f0 !important; }
+html.light .hover\:bg-slate-950\/90:hover { background-color: #f1f5f9 !important; }
+html.light .hover\:bg-slate-950\/80:hover { background-color: #f1f5f9 !important; }
+html.light .hover\:bg-slate-950\/70:hover { background-color: #f1f5f9 !important; }
+html.light .hover\:bg-slate-950\/60:hover { background-color: #f1f5f9 !important; }
+html.light .hover\:bg-slate-950\/50:hover { background-color: #f1f5f9 !important; }
+html.light .hover\:bg-slate-950\/40:hover { background-color: #f8fafc !important; }
+html.light .hover\:bg-slate-900:hover { background-color: #f1f5f9 !important; }
+html.light .hover\:bg-slate-900\/80:hover { background-color: #f1f5f9 !important; }
+html.light .hover\:bg-slate-900\/60:hover { background-color: #f1f5f9 !important; }
+html.light .hover\:bg-slate-800:hover { background-color: #e2e8f0 !important; }
+html.light .hover\:bg-slate-800\/80:hover { background-color: #e2e8f0 !important; }
+html.light .hover\:bg-slate-800\/70:hover { background-color: #e2e8f0 !important; }
+html.light .hover\:bg-slate-800\/60:hover { background-color: #e2e8f0 !important; }
+html.light .hover\:bg-slate-800\/50:hover { background-color: #f1f5f9 !important; }
+html.light .hover\:bg-slate-800\/40:hover { background-color: #f1f5f9 !important; }
+html.light .hover\:bg-slate-800\/30:hover { background-color: #f8fafc !important; }
+html.light .hover\:bg-slate-700:hover { background-color: #cbd5e1 !important; }
+html.light .bg-slate-700 { background-color: #cbd5e1 !important; }
+
+/* Dark modal backdrop overlays stay dark translucent */
+html.light .bg-slate-950\/80.backdrop-blur-sm,
+html.light .bg-black\/70,
+html.light .bg-black\/60 {
+  background-color: rgba(15, 23, 42, 0.52) !important;
+}
+
+/* Borders & Dividers */
+html.light .border-slate-900 { border-color: #e2e8f0 !important; }
+html.light .border-slate-800 { border-color: #e2e8f0 !important; }
+html.light .border-slate-800\/90 { border-color: rgba(226, 232, 240, 0.95) !important; }
+html.light .border-slate-800\/80 { border-color: rgba(226, 232, 240, 0.9) !important; }
+html.light .border-slate-800\/70 { border-color: rgba(226, 232, 240, 0.85) !important; }
+html.light .border-slate-800\/60 { border-color: rgba(226, 232, 240, 0.8) !important; }
+html.light .border-slate-700 { border-color: #cbd5e1 !important; }
+html.light .border-slate-700\/80 { border-color: rgba(203, 213, 225, 0.9) !important; }
+html.light .border-slate-700\/70 { border-color: rgba(203, 213, 225, 0.85) !important; }
+html.light .border-slate-700\/60 { border-color: rgba(203, 213, 225, 0.8) !important; }
+html.light .border-slate-700\/50 { border-color: rgba(203, 213, 225, 0.7) !important; }
+html.light .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+html.light .divide-slate-800\/80 > :not([hidden]) ~ :not([hidden]),
+html.light .divide-slate-800\/70 > :not([hidden]) ~ :not([hidden]),
+html.light .divide-slate-800\/60 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #e2e8f0 !important;
+}
+
+/* Text Colors */
+html.light .text-white { color: #0f172a !important; }
+html.light .text-slate-100 { color: #0f172a !important; }
+html.light .text-slate-200 { color: #1e293b !important; }
+html.light .text-slate-300 { color: #334155 !important; }
+html.light .text-slate-400 { color: #475569 !important; }
+html.light .text-slate-500 { color: #64748b !important; }
+html.light .text-slate-600 { color: #475569 !important; }
+html.light .hover\:text-white:hover { color: #0f172a !important; }
+html.light .hover\:text-slate-200:hover { color: #1e293b !important; }
+html.light .hover\:text-slate-300:hover { color: #334155 !important; }
+html.light .placeholder\:text-slate-500::placeholder,
+html.light .placeholder-slate-500::placeholder { color: #94a3b8 !important; }
+
+/* Preserve white text inside solid/gradient colored buttons, badges, and icons */
+html.light .bg-indigo-600,
+html.light .bg-indigo-500,
+html.light .bg-emerald-600,
+html.light .bg-emerald-500,
+html.light .bg-cyan-600,
+html.light .bg-rose-600,
+html.light .bg-blue-600,
+html.light .bg-violet-600,
+html.light .bg-amber-600,
+html.light .from-indigo-600,
+html.light .from-emerald-600,
+html.light .from-cyan-600,
+html.light .from-rose-600 {
+  color: #ffffff !important;
+}
+
+html.light .bg-indigo-600 .text-white,
+html.light .bg-indigo-500 .text-white,
+html.light .bg-emerald-600 .text-white,
+html.light .bg-emerald-500 .text-white,
+html.light .bg-cyan-600 .text-white,
+html.light .bg-rose-600 .text-white,
+html.light .bg-blue-600 .text-white,
+html.light .bg-violet-600 .text-white,
+html.light .bg-amber-600 .text-white,
+html.light .from-indigo-600 .text-white,
+html.light .from-emerald-600 .text-white,
+html.light .from-cyan-600 .text-white,
+html.light .from-rose-600 .text-white,
+html.light .bg-indigo-600.text-white,
+html.light .bg-indigo-500.text-white,
+html.light .bg-emerald-600.text-white,
+html.light .bg-emerald-500.text-white,
+html.light .bg-cyan-600.text-white,
+html.light .bg-rose-600.text-white,
+html.light .bg-blue-600.text-white,
+html.light .bg-violet-600.text-white,
+html.light .bg-amber-600.text-white {
+  color: #ffffff !important;
+}
+
+/* Preserve dark text on amber-500 / amber-400 buttons */
+html.light .bg-amber-500,
+html.light .bg-amber-400 {
+  color: #0f172a !important;
+}
+
+/* Soft tinted surfaces (dark -950 / -900 gradients & badges -> light pastel tints) */
+html.light .bg-indigo-950\/50,
+html.light .bg-indigo-950\/40,
+html.light .bg-indigo-950\/30,
+html.light .bg-indigo-900\/30,
+html.light .bg-indigo-900\/20 {
+  background-color: rgba(238, 242, 255, 0.9) !important;
+}
+html.light .bg-emerald-950\/50,
+html.light .bg-emerald-950\/40,
+html.light .bg-emerald-950\/30,
+html.light .bg-emerald-900\/30 {
+  background-color: rgba(236, 253, 245, 0.9) !important;
+}
+html.light .bg-amber-950\/50,
+html.light .bg-amber-950\/40,
+html.light .bg-amber-950\/30 {
+  background-color: rgba(255, 251, 235, 0.92) !important;
+}
+html.light .bg-rose-950\/50,
+html.light .bg-rose-950\/40,
+html.light .bg-rose-950\/30 {
+  background-color: rgba(255, 241, 242, 0.92) !important;
+}
+html.light .bg-cyan-950\/50,
+html.light .bg-cyan-950\/40,
+html.light .bg-cyan-950\/30 {
+  background-color: rgba(236, 254, 255, 0.92) !important;
+}
+
+html.light .from-indigo-950\/70,
+html.light .from-indigo-950\/60,
+html.light .from-indigo-950\/50,
+html.light .from-indigo-950\/40,
+html.light .from-indigo-600\/25,
+html.light .from-indigo-600\/20 {
+  --tw-gradient-from: rgba(224, 231, 255, 0.85) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(255, 255, 255, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.light .from-emerald-600\/20 {
+  --tw-gradient-from: rgba(209, 250, 229, 0.85) var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgba(255, 255, 255, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+html.light .via-slate-900 {
+  --tw-gradient-to: rgba(248, 250, 252, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #f8fafc var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+html.light .via-teal-600\/10 {
+  --tw-gradient-to: rgba(240, 253, 250, 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), rgba(240, 253, 250, 0.9) var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+html.light .to-slate-900,
+html.light .to-slate-950 {
+  --tw-gradient-to: #ffffff var(--tw-gradient-to-position) !important;
+}
+html.light .from-emerald-950\/60,
+html.light .from-emerald-950\/50,
+html.light .from-emerald-950\/40 {
+  --tw-gradient-from: rgba(209, 250, 229, 0.78) var(--tw-gradient-from-position) !important;
+}
+html.light .from-amber-950\/60,
+html.light .from-amber-950\/50,
+html.light .from-amber-950\/40 {
+  --tw-gradient-from: rgba(254, 243, 199, 0.85) var(--tw-gradient-from-position) !important;
+}
+html.light .from-rose-950\/60,
+html.light .from-rose-950\/50,
+html.light .from-rose-950\/40 {
+  --tw-gradient-from: rgba(255, 228, 230, 0.85) var(--tw-gradient-from-position) !important;
+}
+html.light .from-cyan-950\/60,
+html.light .from-cyan-950\/50,
+html.light .from-cyan-950\/40 {
+  --tw-gradient-from: rgba(207, 250, 254, 0.85) var(--tw-gradient-from-position) !important;
+}
+
+/* Darken light-pastel accent text on light backgrounds for WCAG contrast */
+html.light .text-indigo-300,
+html.light .text-indigo-400 { color: #4338ca !important; }
+html.light .text-emerald-300,
+html.light .text-emerald-400 { color: #047857 !important; }
+html.light .text-amber-300,
+html.light .text-amber-400 { color: #b45309 !important; }
+html.light .text-rose-300,
+html.light .text-rose-400 { color: #be123c !important; }
+html.light .text-cyan-300,
+html.light .text-cyan-400 { color: #0e7490 !important; }
+html.light .text-violet-300,
+html.light .text-violet-400 { color: #6d28d9 !important; }
+html.light .text-blue-300,
+html.light .text-blue-400 { color: #1d4ed8 !important; }
+
+/* Keep light accent text inside solid dark/colored containers */
+html.light .bg-indigo-600 .text-indigo-200,
+html.light .bg-indigo-600 .text-indigo-300 { color: #e0e7ff !important; }
+html.light .wa-preview-box,
+html.light .wa-preview-box textarea {
+  background-color: #0b141a !important;
+  color: #f8fafc !important;
+  border-color: #1f2c34 !important;
+}
+html.light .wa-preview-box .wa-preview-inner {
+  background-color: #1f2c34 !important;
+  color: #f8fafc !important;
+}
+
+/* Form controls */
+html.light select,
+html.light input,
+html.light textarea {
+  color: #0f172a;
+}
+html.light select option {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+html.light select optgroup {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+
+/* SVG Chart Grid & Track Overrides */
+html.light .chart-grid-stroke {
+  stroke: #cbd5e1 !important;
+}
+html.light .chart-track-stroke {
+  stroke: #e2e8f0 !important;
+}
+
+/* Elevated light cards subtle shadow */
+html.light .shadow-xl,
+html.light .shadow-2xl {
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.12), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
+}
