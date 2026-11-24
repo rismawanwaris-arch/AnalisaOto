@@ -24,7 +24,7 @@ export default function LoginView({ onLoginSuccess, usingDefaultPassword }) {
         setError(data.error || 'Login gagal. Periksa username dan password Anda.');
         return;
       }
-      onLoginSuccess(data.username);
+      onLoginSuccess(data);
     } catch {
       setError('Gagal menghubungi server. Pastikan server AnalisaOto sedang berjalan.');
     } finally {

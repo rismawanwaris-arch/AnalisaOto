@@ -8,11 +8,16 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   requireAuth,
+  requireRole,
   ensureAuthInitialized,
   handleAuthStatus,
   handleLogin,
   handleLogout,
   handleChangePassword,
+  handleListUsers,
+  handleCreateUser,
+  handleUpdateUser,
+  handleDeleteUser,
 } from './auth.js';
 import {
   ensureSeedDataIfEmpty,
@@ -136,6 +141,12 @@ app.get('/api/auth/status', handleAuthStatus);
 app.post('/api/auth/login', loginLimiter, handleLogin);
 app.post('/api/auth/logout', handleLogout);
 app.post('/api/auth/change-password', requireAuth, handleChangePassword);
+
+// User Management Endpoints (Admin Only)
+app.get('/api/users', requireAuth, requireRole('admin'), handleListUsers);
+app.post('/api/users', requireAuth, requireRole('admin'), handleCreateUser);
+app.put('/api/users/:id', requireAuth, requireRole('admin'), handleUpdateUser);
+app.delete('/api/users/:id', requireAuth, requireRole('admin'), handleDeleteUser);
 
 // 5. Global Authentication Gate for all other /api/* endpoints
 app.use('/api', (req, res, next) => {
@@ -315,7 +326,7 @@ app.get('/api/analytics', (req, res) => {
 });
 
 // 3. Upload Excel files (Single Day or Multi-Day / Multi-File Batch)
-app.post('/api/upload', upload.array('files', 15), async (req, res) => {
+app.post('/api/upload', requireRole('admin', 'analyst'), upload.array('files', 15), async (req, res) => {
   try {
     const files = req.files || [];
     const writeMode = req.body.writeMode || 'replace'; // 'replace' or 'append'
@@ -387,7 +398,7 @@ app.post('/api/upload', upload.array('files', 15), async (req, res) => {
 });
 
 // 4. Simulate Uncategorized Products (disabled in production unless ENABLE_DEMO_TOOLS=true)
-app.post('/api/simulate-new-products', async (req, res) => {
+app.post('/api/simulate-new-products', requireRole('admin'), async (req, res) => {
   if (!ENABLE_DEMO_TOOLS) {
     return res.status(403).json({
       error: 'Fitur simulasi/sampel dinonaktifkan di mode produksi.',
@@ -441,7 +452,7 @@ app.post('/api/simulate-new-products', async (req, res) => {
 });
 
 // 5. Batch Mapping from Interactive Mapping Wizard (Instant Recalculation)
-app.post('/api/rules/batch-map', (req, res) => {
+app.post('/api/rules/batch-map', requireRole('admin', 'analyst'), (req, res) => {
   try {
     const { mappings = [], newCategories = [] } = req.body;
     let categories = getCategories();
@@ -515,7 +526,7 @@ app.post('/api/rules/batch-map', (req, res) => {
 });
 
 // 6. CRUD for Rules
-app.post('/api/rules', (req, res) => {
+app.post('/api/rules', requireRole('admin', 'analyst'), (req, res) => {
   try {
     const { categoryId, subCategory, matchType, pattern, note } = req.body;
     if (!categoryId || !matchType || !pattern) {
@@ -546,7 +557,7 @@ app.post('/api/rules', (req, res) => {
   }
 });
 
-app.put('/api/rules/:id', (req, res) => {
+app.put('/api/rules/:id', requireRole('admin', 'analyst'), (req, res) => {
   try {
     const { id } = req.params;
     const { categoryId, subCategory, matchType, pattern, note } = req.body;
@@ -576,7 +587,7 @@ app.put('/api/rules/:id', (req, res) => {
   }
 });
 
-app.delete('/api/rules/:id', (req, res) => {
+app.delete('/api/rules/:id', requireRole('admin', 'analyst'), (req, res) => {
   try {
     const { id } = req.params;
     const rules = getRules().filter((r) => r.id !== id);
@@ -594,7 +605,7 @@ app.delete('/api/rules/:id', (req, res) => {
 });
 
 // 7. CRUD for Categories
-app.post('/api/categories', (req, res) => {
+app.post('/api/categories', requireRole('admin', 'analyst'), (req, res) => {
   try {
     const { name, shortName, color, icon, description } = req.body;
     if (!name) {
@@ -623,7 +634,7 @@ app.post('/api/categories', (req, res) => {
   }
 });
 
-app.put('/api/categories/:id', (req, res) => {
+app.put('/api/categories/:id', requireRole('admin', 'analyst'), (req, res) => {
   try {
     const { id } = req.params;
     const { name, shortName, color, icon, description, order } = req.body;
@@ -652,7 +663,7 @@ app.put('/api/categories/:id', (req, res) => {
   }
 });
 
-app.delete('/api/categories/:id', (req, res) => {
+app.delete('/api/categories/:id', requireRole('admin', 'analyst'), (req, res) => {
   try {
     const { id } = req.params;
     const categories = getCategories().filter((c) => c.id !== id);
@@ -673,7 +684,7 @@ app.delete('/api/categories/:id', (req, res) => {
 });
 
 // 8. Reset Categories & Rules to Default
-app.post('/api/settings/reset-defaults', (req, res) => {
+app.post('/api/settings/reset-defaults', requireRole('admin'), (req, res) => {
   try {
     const { categories, rules } = resetCategoriesAndRulesToDefault();
     res.json({
@@ -699,7 +710,7 @@ app.get('/api/products/catalog', (req, res) => {
 });
 
 // 10. Delete a specific date from local database
-app.delete('/api/dates/:date', (req, res) => {
+app.delete('/api/dates/:date', requireRole('admin'), (req, res) => {
   try {
     const { date } = req.params;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {

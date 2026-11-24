@@ -4,12 +4,13 @@ import path from 'path';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const AUTH_CONFIG_FILE = path.join(DATA_DIR, '.auth_config.json');
+const USERS_FILE = path.join(DATA_DIR, '.users.json');
 const SESSION_SECRET_FILE = path.join(DATA_DIR, '.session_secret');
-const SESSION_VERSION_FILE = path.join(DATA_DIR, '.session_version');
 const SESSION_COOKIE_NAME = 'analisaoto_session';
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const VALID_ROLES = new Set(['admin', 'analyst', 'viewer']);
 
-let cachedSessionVersion = null;
+let usersCache = null;
 
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
@@ -35,9 +36,6 @@ function writeSecretFileAtomic(filePath, content) {
   }
 }
 
-/**
- * Loads or generates a persistent cryptographic session secret.
- */
 function getSessionSecret() {
   if (process.env.SESSION_SECRET && process.env.SESSION_SECRET.length >= 32) {
     return process.env.SESSION_SECRET;
@@ -50,36 +48,6 @@ function getSessionSecret() {
   const generated = crypto.randomBytes(48).toString('hex');
   writeSecretFileAtomic(SESSION_SECRET_FILE, generated);
   return generated;
-}
-
-/**
- * Reads the monotonic session version used for server-side token revocation.
- */
-function getSessionVersion() {
-  if (typeof cachedSessionVersion === 'number' && cachedSessionVersion >= 1) {
-    return cachedSessionVersion;
-  }
-  ensureDataDir();
-  if (fs.existsSync(SESSION_VERSION_FILE)) {
-    const parsed = parseInt(fs.readFileSync(SESSION_VERSION_FILE, 'utf-8').trim(), 10);
-    if (Number.isInteger(parsed) && parsed >= 1) {
-      cachedSessionVersion = parsed;
-      return parsed;
-    }
-  }
-  cachedSessionVersion = 1;
-  writeSecretFileAtomic(SESSION_VERSION_FILE, '1');
-  return 1;
-}
-
-/**
- * Increments the persisted session version, immediately revoking all previously issued tokens.
- */
-function bumpSessionVersion() {
-  const nextVersion = getSessionVersion() + 1;
-  cachedSessionVersion = nextVersion;
-  writeSecretFileAtomic(SESSION_VERSION_FILE, String(nextVersion));
-  return nextVersion;
 }
 
 function hashPassword(password, saltHex = null) {
@@ -102,108 +70,180 @@ function constantTimeStringEqual(a, b) {
   return crypto.timingSafeEqual(bufA, bufB);
 }
 
-function readValidHashedAuthConfig() {
+function readLegacyAuthConfig() {
   if (!fs.existsSync(AUTH_CONFIG_FILE)) return null;
   try {
     const parsed = JSON.parse(fs.readFileSync(AUTH_CONFIG_FILE, 'utf-8'));
     if (parsed?.username && parsed?.salt && parsed?.hash) {
-      return {
-        mode: 'hashed',
-        username: parsed.username,
-        salt: parsed.salt,
-        hash: parsed.hash,
-      };
+      return parsed;
     }
   } catch {
-    // Unreadable or invalid auth config file
+    // Ignore unreadable legacy file
   }
   return null;
 }
 
+function loadUsers() {
+  if (usersCache) {
+    return usersCache;
+  }
+  ensureDataDir();
+  if (fs.existsSync(USERS_FILE)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(USERS_FILE, 'utf-8'));
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        usersCache = parsed;
+        return usersCache;
+      }
+    } catch {
+      // Fallback to initialization
+    }
+  }
+  return null;
+}
+
+function saveUsers(users) {
+  writeSecretFileAtomic(USERS_FILE, JSON.stringify(users, null, 2));
+  usersCache = users;
+}
+
+function sanitizeUserForClient(user) {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName || user.username,
+    role: user.role || 'viewer',
+    active: user.active !== false,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt,
+    lastLoginAt: user.lastLoginAt || null,
+  };
+}
+
 /**
- * Ensures initial admin authentication is configured without any hardcoded fallback password.
- * If neither a hashed config file nor ADMIN_PASS env var exists, generates a random 16-char password once.
+ * Ensures at least one Admin user exists in .users.json.
+ * Migrates seamlessly from legacy .auth_config.json or ADMIN_USER/ADMIN_PASS env vars.
  */
 export function ensureAuthInitialized() {
   ensureDataDir();
-  if (process.env.FORCE_ENV_AUTH !== 'true') {
-    const existing = readValidHashedAuthConfig();
-    if (existing) return existing;
-  }
-
+  const existing = loadUsers();
+  const envUser = String(process.env.ADMIN_USER || 'admin').trim().toLowerCase() || 'admin';
   const envPass = String(process.env.ADMIN_PASS || '').trim();
-  const envUser = String(process.env.ADMIN_USER || 'admin').trim() || 'admin';
-  if (envPass) {
-    return { mode: 'env', username: envUser, password: envPass };
+
+  if (existing && existing.length > 0) {
+    // If FORCE_ENV_AUTH=true and ADMIN_PASS is set, sync env admin credentials
+    if (process.env.FORCE_ENV_AUTH === 'true' && envPass) {
+      const { salt, hash } = hashPassword(envPass);
+      const idx = existing.findIndex((u) => u.username === envUser);
+      if (idx !== -1) {
+        existing[idx] = {
+          ...existing[idx],
+          salt,
+          hash,
+          role: 'admin',
+          active: true,
+          updatedAt: new Date().toISOString(),
+        };
+      } else {
+        existing.unshift({
+          id: `usr_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+          username: envUser,
+          displayName: 'Administrator',
+          role: 'admin',
+          active: true,
+          salt,
+          hash,
+          sessionVersion: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          lastLoginAt: null,
+        });
+      }
+      saveUsers(existing);
+    }
+    return existing;
   }
 
-  // First run with no ADMIN_PASS and no .auth_config.json: generate a one-time random password
-  const generatedPassword = crypto.randomBytes(12).toString('base64url');
-  const { salt, hash } = hashPassword(generatedPassword);
-  writeSecretFileAtomic(
-    AUTH_CONFIG_FILE,
-    JSON.stringify(
+  // Migrate from legacy .auth_config.json if present
+  const legacy = process.env.FORCE_ENV_AUTH !== 'true' ? readLegacyAuthConfig() : null;
+  if (legacy) {
+    const migrated = [
       {
-        username: envUser,
-        salt,
-        hash,
-        createdAt: new Date().toISOString(),
-        initialGenerated: true,
+        id: `usr_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+        username: String(legacy.username).trim().toLowerCase(),
+        displayName: 'Administrator',
+        role: 'admin',
+        active: true,
+        salt: legacy.salt,
+        hash: legacy.hash,
+        sessionVersion: 1,
+        createdAt: legacy.createdAt || new Date().toISOString(),
+        updatedAt: legacy.updatedAt || new Date().toISOString(),
+        lastLoginAt: null,
       },
-      null,
-      2
-    )
-  );
+    ];
+    saveUsers(migrated);
+    return migrated;
+  }
 
-  console.log('================================================================');
-  console.log('🔐 KREDENSIAL ADMIN BARU DIBUAT OTOMATIS (CATAT SEKARANG):');
-  console.log(`   Username : ${envUser}`);
-  console.log(`   Password : ${generatedPassword}`);
-  console.log('   (Segera ubah password melalui menu Keamanan Akun setelah login)');
-  console.log('================================================================');
+  // Create initial admin from ADMIN_PASS or generate random password
+  let initialPass = envPass;
+  let generated = false;
+  if (!initialPass) {
+    initialPass = crypto.randomBytes(12).toString('base64url');
+    generated = true;
+  }
 
-  return { mode: 'hashed', username: envUser, salt, hash };
+  const { salt, hash } = hashPassword(initialPass);
+  const initialUsers = [
+    {
+      id: `usr_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+      username: envUser,
+      displayName: 'Administrator',
+      role: 'admin',
+      active: true,
+      salt,
+      hash,
+      sessionVersion: 1,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      lastLoginAt: null,
+    },
+  ];
+  saveUsers(initialUsers);
+
+  if (generated) {
+    console.log('================================================================');
+    console.log('🔐 KREDENSIAL ADMIN BARU DIBUAT OTOMATIS (CATAT SEKARANG):');
+    console.log(`   Username : ${envUser}`);
+    console.log(`   Password : ${initialPass}`);
+    console.log('   (Segera ubah password melalui menu Keamanan Akun setelah login)');
+    console.log('================================================================');
+  }
+
+  return initialUsers;
 }
 
-/**
- * Returns active admin credentials configuration.
- * Priority:
- * 1. User-updated/generated hashed password in DATA_DIR/.auth_config.json (unless FORCE_ENV_AUTH=true)
- * 2. Environment variables ADMIN_USER / ADMIN_PASS
- * 3. First-run auto-generated password persisted hashed in DATA_DIR/.auth_config.json
- */
-function getAuthConfig() {
-  const envUser = String(process.env.ADMIN_USER || 'admin').trim() || 'admin';
-  const envPass = String(process.env.ADMIN_PASS || '').trim();
-
-  if (process.env.FORCE_ENV_AUTH !== 'true') {
-    const existing = readValidHashedAuthConfig();
-    if (existing) return existing;
-  }
-
-  if (envPass) {
-    return { mode: 'env', username: envUser, password: envPass };
-  }
-
-  return ensureAuthInitialized();
+function getAllUsersInternal() {
+  return loadUsers() || ensureAuthInitialized();
 }
 
-function verifyCredentials(username, password) {
-  const cfg = getAuthConfig();
-  if (!constantTimeStringEqual(username, cfg.username)) {
-    return false;
-  }
-  if (cfg.mode === 'hashed') {
-    return verifyScryptPassword(password, cfg.salt, cfg.hash);
-  }
-  return constantTimeStringEqual(password, cfg.password);
+function findUserByUsername(username) {
+  const clean = String(username || '').trim().toLowerCase();
+  return getAllUsersInternal().find((u) => u.username === clean) || null;
 }
 
-function signSessionToken(username) {
+function findUserById(id) {
+  return getAllUsersInternal().find((u) => u.id === id) || null;
+}
+
+function signSessionToken(user) {
   const secret = getSessionSecret();
   const payloadObj = {
-    u: username,
-    v: getSessionVersion(),
+    uid: user.id,
+    u: user.username,
+    role: user.role || 'viewer',
+    v: user.sessionVersion || 1,
     exp: Date.now() + SESSION_TTL_MS,
     nonce: crypto.randomBytes(8).toString('hex'),
   };
@@ -224,13 +264,17 @@ function verifySessionToken(token) {
 
   try {
     const payload = JSON.parse(Buffer.from(payloadB64, 'base64url').toString('utf-8'));
-    if (!payload?.u || !payload?.exp || Date.now() > payload.exp) {
+    if (!payload?.uid || !payload?.u || !payload?.exp || Date.now() > payload.exp) {
       return null;
     }
-    if (payload.v !== getSessionVersion()) {
+    const user = findUserById(payload.uid);
+    if (!user || user.active === false) {
       return null;
     }
-    return payload;
+    if ((user.sessionVersion || 1) !== payload.v) {
+      return null;
+    }
+    return user;
   } catch {
     return null;
   }
@@ -254,23 +298,37 @@ function parseCookies(req) {
   return cookies;
 }
 
-export function getAuthenticatedUser(req) {
+export function getAuthenticatedUserObj(req) {
   const cookies = parseCookies(req);
   const token = cookies[SESSION_COOKIE_NAME];
-  const session = verifySessionToken(token);
-  return session ? session.u : null;
+  return verifySessionToken(token);
 }
 
 export function requireAuth(req, res, next) {
-  const user = getAuthenticatedUser(req);
+  const user = getAuthenticatedUserObj(req);
   if (!user) {
     return res.status(401).json({
       error: 'Akses ditolak. Silakan login terlebih dahulu untuk mengakses data AnalisaOto.',
       code: 'UNAUTHORIZED',
     });
   }
-  req.user = user;
+  req.user = user.username;
+  req.userId = user.id;
+  req.userRole = user.role || 'viewer';
+  req.displayName = user.displayName || user.username;
   next();
+}
+
+export function requireRole(...allowedRoles) {
+  return (req, res, next) => {
+    if (!allowedRoles.includes(req.userRole)) {
+      return res.status(403).json({
+        error: 'Akses ditolak. Peran akun Anda tidak memiliki izin untuk tindakan ini.',
+        code: 'FORBIDDEN',
+      });
+    }
+    next();
+  };
 }
 
 function setSessionCookie(res, req, token) {
@@ -296,21 +354,26 @@ function clearSessionCookie(res) {
 }
 
 export function handleAuthStatus(req, res) {
-  const user = getAuthenticatedUser(req);
+  const user = getAuthenticatedUserObj(req);
   if (!user) {
     return res.json({
       authenticated: false,
       username: null,
+      displayName: null,
+      role: null,
       usingDefaultPassword: false,
     });
   }
-  const cfg = getAuthConfig();
+  const envPass = String(process.env.ADMIN_PASS || '').trim();
   res.json({
     authenticated: true,
-    username: user,
+    username: user.username,
+    displayName: user.displayName || user.username,
+    role: user.role || 'viewer',
     usingDefaultPassword:
-      cfg.mode === 'env' &&
-      (cfg.password === 'GantiDenganPasswordKuatAnda#2026' || cfg.password.length < 12),
+      process.env.FORCE_ENV_AUTH === 'true' &&
+      Boolean(envPass) &&
+      (envPass === 'GantiDenganPasswordKuatAnda#2026' || envPass.length < 12),
   });
 }
 
@@ -319,21 +382,43 @@ export function handleLogin(req, res) {
   if (!username || !password) {
     return res.status(400).json({ error: 'Username dan password wajib diisi.' });
   }
-  if (!verifyCredentials(String(username).trim(), String(password))) {
+  const user = findUserByUsername(username);
+  if (!user || !verifyScryptPassword(password, user.salt, user.hash)) {
     return res.status(401).json({ error: 'Username atau password salah.' });
   }
-  const token = signSessionToken(String(username).trim());
+  if (user.active === false) {
+    return res.status(403).json({ error: 'Akun ini sedang dinonaktifkan oleh Administrator.' });
+  }
+
+  const users = getAllUsersInternal();
+  const idx = users.findIndex((u) => u.id === user.id);
+  if (idx !== -1) {
+    users[idx] = { ...users[idx], lastLoginAt: new Date().toISOString() };
+    saveUsers(users);
+  }
+
+  const token = signSessionToken(users[idx] || user);
   setSessionCookie(res, req, token);
   res.json({
     success: true,
-    username: String(username).trim(),
+    username: user.username,
+    displayName: user.displayName || user.username,
+    role: user.role || 'viewer',
   });
 }
 
 export function handleLogout(req, res) {
-  const user = getAuthenticatedUser(req);
+  const user = getAuthenticatedUserObj(req);
   if (user) {
-    bumpSessionVersion();
+    const users = getAllUsersInternal();
+    const idx = users.findIndex((u) => u.id === user.id);
+    if (idx !== -1) {
+      users[idx] = {
+        ...users[idx],
+        sessionVersion: (users[idx].sessionVersion || 1) + 1,
+      };
+      saveUsers(users);
+    }
   }
   clearSessionCookie(res);
   res.json({ success: true });
@@ -341,41 +426,187 @@ export function handleLogout(req, res) {
 
 export function handleChangePassword(req, res) {
   const { currentPassword, newPassword } = req.body || {};
-  const activeUser = req.user;
-
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ error: 'Password lama dan password baru wajib diisi.' });
   }
   if (String(newPassword).length < 8) {
     return res.status(400).json({ error: 'Password baru minimal harus 8 karakter.' });
   }
-  if (!verifyCredentials(activeUser, String(currentPassword))) {
+
+  const users = getAllUsersInternal();
+  const idx = users.findIndex((u) => u.id === req.userId);
+  if (idx === -1 || !verifyScryptPassword(currentPassword, users[idx].salt, users[idx].hash)) {
     return res.status(401).json({ error: 'Password saat ini salah.' });
   }
 
-  ensureDataDir();
   const { salt, hash } = hashPassword(String(newPassword));
-  writeSecretFileAtomic(
-    AUTH_CONFIG_FILE,
-    JSON.stringify(
-      {
-        username: activeUser,
-        salt,
-        hash,
-        updatedAt: new Date().toISOString(),
-      },
-      null,
-      2
-    )
-  );
+  users[idx] = {
+    ...users[idx],
+    salt,
+    hash,
+    sessionVersion: (users[idx].sessionVersion || 1) + 1,
+    updatedAt: new Date().toISOString(),
+  };
+  saveUsers(users);
 
-  // Invalidate all previously issued sessions, then issue a fresh cookie for this session
-  bumpSessionVersion();
-  const token = signSessionToken(activeUser);
+  const token = signSessionToken(users[idx]);
   setSessionCookie(res, req, token);
 
   res.json({
     success: true,
     message: 'Password berhasil diperbarui dan disimpan terenkripsi.',
+  });
+}
+
+// ==================== USER MANAGEMENT HANDLERS (ADMIN ONLY) ====================
+
+export function handleListUsers(req, res) {
+  const users = getAllUsersInternal().map(sanitizeUserForClient);
+  res.json({ users });
+}
+
+export function handleCreateUser(req, res) {
+  const { username, displayName, password, role = 'viewer' } = req.body || {};
+  const cleanUsername = String(username || '').trim().toLowerCase();
+
+  if (!/^[a-z0-9._-]{3,32}$/.test(cleanUsername)) {
+    return res.status(400).json({
+      error: 'Username harus 3–32 karakter (hanya huruf kecil, angka, titik, underscore, atau strip).',
+    });
+  }
+  if (!password || String(password).length < 8) {
+    return res.status(400).json({ error: 'Password minimal harus 8 karakter.' });
+  }
+  if (!VALID_ROLES.has(role)) {
+    return res.status(400).json({ error: 'Role tidak valid (pilih admin, analyst, atau viewer).' });
+  }
+
+  const users = getAllUsersInternal();
+  if (users.some((u) => u.username === cleanUsername)) {
+    return res.status(409).json({ error: `Username "${cleanUsername}" sudah terdaftar.` });
+  }
+
+  const { salt, hash } = hashPassword(String(password));
+  const now = new Date().toISOString();
+  const newUser = {
+    id: `usr_${Date.now()}_${crypto.randomBytes(3).toString('hex')}`,
+    username: cleanUsername,
+    displayName: String(displayName || cleanUsername).trim().slice(0, 60),
+    role,
+    active: true,
+    salt,
+    hash,
+    sessionVersion: 1,
+    createdAt: now,
+    updatedAt: now,
+    lastLoginAt: null,
+  };
+
+  users.push(newUser);
+  saveUsers(users);
+
+  res.status(201).json({
+    success: true,
+    user: sanitizeUserForClient(newUser),
+    users: users.map(sanitizeUserForClient),
+  });
+}
+
+export function handleUpdateUser(req, res) {
+  const { id } = req.params;
+  const { displayName, role, active, password } = req.body || {};
+
+  const users = getAllUsersInternal();
+  const idx = users.findIndex((u) => u.id === id);
+  if (idx === -1) {
+    return res.status(404).json({ error: 'User tidak ditemukan.' });
+  }
+
+  const target = users[idx];
+
+  // Prevent admin from deactivating or demoting themselves
+  if (target.id === req.userId) {
+    if (active === false) {
+      return res.status(400).json({ error: 'Anda tidak dapat menonaktifkan akun Anda sendiri.' });
+    }
+    if (role && role !== 'admin') {
+      return res.status(400).json({ error: 'Anda tidak dapat menurunkan role admin Anda sendiri.' });
+    }
+  }
+
+  // Prevent removing/disabling the last active admin
+  const activeAdminsCount = users.filter((u) => u.role === 'admin' && u.active !== false).length;
+  const isTargetActiveAdmin = target.role === 'admin' && target.active !== false;
+  const willStopBeingActiveAdmin =
+    (role && role !== 'admin') || active === false;
+  if (isTargetActiveAdmin && willStopBeingActiveAdmin && activeAdminsCount <= 1) {
+    return res.status(400).json({ error: 'Minimal harus ada 1 akun Admin yang aktif.' });
+  }
+
+  if (role && !VALID_ROLES.has(role)) {
+    return res.status(400).json({ error: 'Role tidak valid.' });
+  }
+
+  let updatedSalt = target.salt;
+  let updatedHash = target.hash;
+  let bumpSession = false;
+
+  if (password !== undefined && String(password).length > 0) {
+    if (String(password).length < 8) {
+      return res.status(400).json({ error: 'Password baru minimal harus 8 karakter.' });
+    }
+    const hashed = hashPassword(String(password));
+    updatedSalt = hashed.salt;
+    updatedHash = hashed.hash;
+    bumpSession = true;
+  }
+
+  if ((role && role !== target.role) || (active !== undefined && active !== target.active)) {
+    bumpSession = true;
+  }
+
+  users[idx] = {
+    ...target,
+    displayName: displayName !== undefined ? String(displayName).trim().slice(0, 60) || target.username : target.displayName,
+    role: role || target.role,
+    active: active !== undefined ? Boolean(active) : target.active,
+    salt: updatedSalt,
+    hash: updatedHash,
+    sessionVersion: bumpSession ? (target.sessionVersion || 1) + 1 : target.sessionVersion || 1,
+    updatedAt: new Date().toISOString(),
+  };
+
+  saveUsers(users);
+
+  res.json({
+    success: true,
+    user: sanitizeUserForClient(users[idx]),
+    users: users.map(sanitizeUserForClient),
+  });
+}
+
+export function handleDeleteUser(req, res) {
+  const { id } = req.params;
+  const users = getAllUsersInternal();
+  const target = users.find((u) => u.id === id);
+  if (!target) {
+    return res.status(404).json({ error: 'User tidak ditemukan.' });
+  }
+  if (target.id === req.userId) {
+    return res.status(400).json({ error: 'Anda tidak dapat menghapus akun Anda sendiri yang sedang login.' });
+  }
+  if (target.role === 'admin' && target.active !== false) {
+    const activeAdmins = users.filter((u) => u.role === 'admin' && u.active !== false).length;
+    if (activeAdmins <= 1) {
+      return res.status(400).json({ error: 'Tidak dapat menghapus Admin terakhir.' });
+    }
+  }
+
+  const remaining = users.filter((u) => u.id !== id);
+  saveUsers(remaining);
+
+  res.json({
+    success: true,
+    users: remaining.map(sanitizeUserForClient),
   });
 }

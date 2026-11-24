@@ -26,6 +26,7 @@ import {
   Building2,
   Lock,
   LogOut,
+  Users,
 } from 'lucide-react';
 import ExecutiveKpiCards from './components/ExecutiveKpiCards.jsx';
 import ComparativeCharts from './components/ComparativeCharts.jsx';
@@ -39,6 +40,7 @@ import UncategorizedWizardModal from './components/UncategorizedWizardModal.jsx'
 import WhatsAppSummaryModal from './components/WhatsAppSummaryModal.jsx';
 import LoginView from './components/LoginView.jsx';
 import ChangePasswordModal from './components/ChangePasswordModal.jsx';
+import UserManagementView from './components/UserManagementView.jsx';
 import {
   formatShortDateIndo,
   formatNumber,
@@ -53,6 +55,8 @@ export default function App() {
     checking: true,
     authenticated: false,
     username: null,
+    displayName: null,
+    role: 'viewer',
     usingDefaultPassword: false,
   });
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
@@ -100,6 +104,8 @@ export default function App() {
         checking: false,
         authenticated: Boolean(data.authenticated),
         username: data.username || null,
+        displayName: data.displayName || data.username || null,
+        role: data.role || 'viewer',
         usingDefaultPassword: Boolean(data.usingDefaultPassword),
       });
     } catch {
@@ -107,6 +113,8 @@ export default function App() {
         checking: false,
         authenticated: false,
         username: null,
+        displayName: null,
+        role: 'viewer',
         usingDefaultPassword: false,
       });
     }
@@ -349,23 +357,39 @@ export default function App() {
       icon: Table,
       badge: null,
     },
-    {
-      id: 'upload',
-      section: 'DATA & PENGATURAN SISTEM',
-      label: '7. Upload Excel & Kalender',
-      shortLabel: 'Upload Data',
-      icon: UploadCloud,
-      badge: `${bootstrapData.datesSummary?.length || 0} Hari`,
-    },
-    {
-      id: 'rules',
-      section: 'DATA & PENGATURAN SISTEM',
-      label: '8. Kamus Kategori & Produk',
-      shortLabel: 'Kamus Aturan',
-      icon: Settings,
-      badge: hasUncategorized ? `${globalUncat.uncategorizedProductCount} Baru!` : `${bootstrapData.rules?.length || 0}`,
-      badgeWarning: hasUncategorized,
-    },
+    ...(authState.role === 'admin' || authState.role === 'analyst'
+      ? [
+          {
+            id: 'upload',
+            section: 'DATA & PENGATURAN SISTEM',
+            label: '7. Upload Excel & Kalender',
+            shortLabel: 'Upload Data',
+            icon: UploadCloud,
+            badge: `${bootstrapData.datesSummary?.length || 0} Hari`,
+          },
+          {
+            id: 'rules',
+            section: 'DATA & PENGATURAN SISTEM',
+            label: '8. Kamus Kategori & Produk',
+            shortLabel: 'Kamus Aturan',
+            icon: Settings,
+            badge: hasUncategorized ? `${globalUncat.uncategorizedProductCount} Baru!` : `${bootstrapData.rules?.length || 0}`,
+            badgeWarning: hasUncategorized,
+          },
+        ]
+      : []),
+    ...(authState.role === 'admin'
+      ? [
+          {
+            id: 'users',
+            section: 'DATA & PENGATURAN SISTEM',
+            label: '9. Management User',
+            shortLabel: 'Kelola User',
+            icon: Users,
+            badge: 'Admin',
+          },
+        ]
+      : []),
   ];
 
   if (authState.checking) {
@@ -383,11 +407,13 @@ export default function App() {
     return (
       <LoginView
         usingDefaultPassword={authState.usingDefaultPassword}
-        onLoginSuccess={(username) => {
+        onLoginSuccess={(loginData) => {
           setAuthState((prev) => ({
             ...prev,
             authenticated: true,
-            username,
+            username: loginData?.username || loginData,
+            displayName: loginData?.displayName || loginData?.username || loginData,
+            role: loginData?.role || 'viewer',
           }));
         }}
       />
@@ -579,7 +605,7 @@ export default function App() {
                     <span>Sesi Terproteksi</span>
                   </span>
                   <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-slate-300">
-                    {authState.username || 'admin'}
+                    {authState.username || 'admin'} ({authState.role || 'admin'})
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-400 leading-relaxed">
@@ -1328,6 +1354,14 @@ export default function App() {
               defaultDate={customD1}
             />
           )}
+
+          {activeMenu === 'users' && authState.role === 'admin' && (
+            <UserManagementView
+              key="users-view"
+              currentUsername={authState.username}
+              onToast={showToast}
+            />
+          )}
         </main>
       </div>
 
@@ -1346,6 +1380,7 @@ export default function App() {
         onClose={() => setWaModalOpen(false)}
         whatsappText={analytics?.whatsappText || ''}
         period={analytics?.period || {}}
+        categoryComparison={analytics?.categoryComparison || []}
       />
 
       {/* Change Password Modal */}
