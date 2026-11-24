@@ -94,8 +94,9 @@ export default function OutletMapView({
   // Map visualization controls
   const [mapMetric, setMapMetric] = useState('trx'); // 'trx' | 'omset' | 'komisi' | 'growth' | 'repeat'
   const [clusterFilter, setClusterFilter] = useState('official'); // 'official' | 'plc' | 'kbb' | 'all'
-  const [hourFilter, setHourFilter] = useState('all'); // 'all' or 0..23
+  const [hourFilter, setHourFilter] = useState('all'); // 'all' | 'shift_pagi' | 'shift_siang' | 'shift_sore' | 'shift_malam' | 0..23
   const [isPlayingHours, setIsPlayingHours] = useState(false);
+  const [showPinLabels, setShowPinLabels] = useState(true);
 
   // Right panel mode: 'input' | 'habit' | 'bulk'
   const [panelTab, setPanelTab] = useState('input');
@@ -202,7 +203,7 @@ export default function OutletMapView({
     if (!isPlayingHours) return undefined;
     const timer = setInterval(() => {
       setHourFilter((prev) => {
-        if (prev === 'all') return 6;
+        if (typeof prev !== 'number') return 6;
         return prev >= 23 ? 0 : prev + 1;
       });
     }, 1000);
@@ -299,13 +300,50 @@ export default function OutletMapView({
     }
   }, [formLat, formLng, panelTab, selectedOutletName]);
 
-  // Compute metric value for an outlet (supports hourFilter!)
+  const SHIFT_RANGES = useMemo(
+    () => ({
+      shift_pagi: { label: 'Pagi (06–11)', from: 6, to: 11 },
+      shift_siang: { label: 'Siang (12–16)', from: 12, to: 16 },
+      shift_sore: { label: 'Sore (17–20)', from: 17, to: 20 },
+      shift_malam: { label: 'Malam (21–23)', from: 21, to: 23 },
+    }),
+    []
+  );
+
+  // Sum trx & omset for the active hour / shift / full 24h
+  const getScopedTrxAndOmset = useCallback(
+    (outlet) => {
+      if (hourFilter === 'all') {
+        return { trx: outlet.trxD1 || 0, omset: outlet.omsetD1 || 0 };
+      }
+      if (typeof hourFilter === 'number') {
+        const hObj = outlet.hourlyComparison?.[hourFilter];
+        return { trx: hObj?.trxD1 || 0, omset: hObj?.omsetD1 || 0 };
+      }
+      const range = SHIFT_RANGES[hourFilter];
+      if (!range) {
+        return { trx: outlet.trxD1 || 0, omset: outlet.omsetD1 || 0 };
+      }
+      let trx = 0;
+      let omset = 0;
+      for (let hr = range.from; hr <= range.to; hr++) {
+        const hObj = outlet.hourlyComparison?.[hr];
+        if (hObj) {
+          trx += hObj.trxD1 || 0;
+          omset += hObj.omsetD1 || 0;
+        }
+      }
+      return { trx, omset };
+    },
+    [hourFilter, SHIFT_RANGES]
+  );
+
+  // Compute metric value for an outlet (supports hourFilter & shifts!)
   const getMetricValue = useCallback(
     (outlet) => {
       if (hourFilter !== 'all') {
-        const hObj = outlet.hourlyComparison?.[hourFilter];
-        if (!hObj) return 0;
-        return mapMetric === 'omset' ? hObj.omsetD1 : hObj.trxD1;
+        const scoped = getScopedTrxAndOmset(outlet);
+        return mapMetric === 'omset' ? scoped.omset : scoped.trx;
       }
       if (mapMetric === 'omset') return outlet.omsetD1 || 0;
       if (mapMetric === 'komisi') return outlet.komisiD1 || 0;
@@ -313,8 +351,50 @@ export default function OutletMapView({
       if (mapMetric === 'repeat') return outlet.customerHabit?.repeatRateD1 || 0;
       return outlet.trxD1 || 0;
     },
+    [hourFilter, mapMetric, getScopedTrxAndOmset]
+  );
+
+  const formatPinBadgeLabel = useCallback(
+    (val) => {
+      if (hourFilter !== 'all') {
+        if (mapMetric === 'omset') {
+          if (val === 0) return '0';
+          return val >= 1_000_000 ? `${(val / 1_000_000).toFixed(1)}Jt` : `${Math.round(val / 1_000)}Rb`;
+        }
+        return formatNumber(val);
+      }
+      if (mapMetric === 'omset' || mapMetric === 'komisi') {
+        if (val === 0) return '0';
+        return val >= 1_000_000 ? `${(val / 1_000_000).toFixed(1)}Jt` : `${Math.round(val / 1_000)}Rb`;
+      }
+      if (mapMetric === 'growth') {
+        return `${val > 0 ? '+' : ''}${Math.round(val)}%`;
+      }
+      if (mapMetric === 'repeat') {
+        return `${val}%`;
+      }
+      return formatNumber(val);
+    },
     [hourFilter, mapMetric]
   );
+
+  const activeTimeLabel = useMemo(() => {
+    if (hourFilter === 'all') return '00:00 – 23:59';
+    if (typeof hourFilter === 'number') return `Jam ${String(hourFilter).padStart(2, '0')}:00`;
+    return SHIFT_RANGES[hourFilter]?.label || '00:00 – 23:59';
+  }, [hourFilter, SHIFT_RANGES]);
+
+  // Top 5 busiest branches in the selected time window
+  const topActiveOutlets = useMemo(() => {
+    return [...scopedOutlets]
+      .map((o) => {
+        const scoped = getScopedTrxAndOmset(o);
+        return { outlet: o, scoped, val: getMetricValue(o) };
+      })
+      .filter((item) => item.scoped.trx > 0)
+      .sort((a, b) => b.val - a.val || b.scoped.trx - a.scoped.trx)
+      .slice(0, 5);
+  }, [scopedOutlets, getScopedTrxAndOmset, getMetricValue]);
 
   // Render saved pins onto Leaflet markersLayer
   useEffect(() => {
@@ -328,20 +408,27 @@ export default function OutletMapView({
       .map((outlet) => {
         const loc = locationByName.get(String(outlet.outletName || '').trim().toUpperCase());
         if (!loc || !isValidLatLng(loc.lat, loc.lng)) return null;
-        return { outlet, loc, val: getMetricValue(outlet) };
+        return {
+          outlet,
+          loc,
+          val: getMetricValue(outlet),
+          scoped: getScopedTrxAndOmset(outlet),
+        };
       })
       .filter(Boolean);
 
     const maxVal = Math.max(1, ...pinnedItems.map((i) => Math.abs(i.val)));
     const bounds = [];
 
-    for (const { outlet, loc, val } of pinnedItems) {
+    for (const { outlet, loc, val, scoped } of pinnedItems) {
       const ratio = Math.min(1, Math.max(0.15, Math.abs(val) / maxVal));
-      const radius = Math.round(8 + ratio * 18);
+      const radius = val === 0 && hourFilter !== 'all' ? 11 : Math.round(11 + ratio * 17);
 
       let color = '#6366f1'; // PLC default indigo
       if (mapMetric === 'growth') {
         color = val > 0 ? '#10b981' : val < 0 ? '#f43f5e' : '#64748b';
+      } else if (hourFilter !== 'all' && val === 0) {
+        color = '#64748b';
       } else if (outlet.groupId === 'out_kbb') {
         color = '#10b981';
       } else if (outlet.groupId === 'non_plc_kbb') {
@@ -357,16 +444,21 @@ export default function OutletMapView({
         color: isSelected ? '#f59e0b' : '#ffffff',
         weight: isSelected ? 3 : 1.5,
         fillColor: color,
-        fillOpacity: hourFilter !== 'all' && val === 0 ? 0.2 : 0.78,
+        fillOpacity: hourFilter !== 'all' && val === 0 ? 0.35 : 0.85,
       });
 
       const habit = outlet.customerHabit || {};
+      const timeRowHtml =
+        hourFilter !== 'all'
+          ? `<div style="font-size:11px;color:#0ea5e9"><b>${activeTimeLabel}:</b> ${formatNumber(scoped.trx)} Trx (${formatCompactRupiah(scoped.omset)})</div>`
+          : '';
       circle.bindTooltip(
-        `<div style="min-width:170px;font-family:Inter,sans-serif">
+        `<div style="min-width:180px;font-family:Inter,sans-serif">
           <div style="font-weight:800;font-size:12px;margin-bottom:2px">${outlet.outletName}</div>
           <div style="font-size:11px;opacity:0.85">${outlet.subCluster || outlet.groupName}</div>
           <hr style="margin:4px 0;opacity:0.2"/>
-          <div style="font-size:11px">Trx D1: <b>${formatNumber(outlet.trxD1)}</b> | Omzet: <b>${formatCompactRupiah(outlet.omsetD1)}</b></div>
+          ${timeRowHtml}
+          <div style="font-size:11px">Total 24J: <b>${formatNumber(outlet.trxD1)} Trx</b> | <b>${formatCompactRupiah(outlet.omsetD1)}</b></div>
           <div style="font-size:11px">Repeat Pelanggan: <b>${habit.repeatRateD1 ?? 0}%</b> (${habit.uniqueCustomersD1 ?? 0} tujuan)</div>
           <div style="font-size:11px">Jam Puncak: <b>${outlet.peakHour || '-'}</b></div>
         </div>`,
@@ -380,6 +472,20 @@ export default function OutletMapView({
       });
 
       circle.addTo(layer);
+
+      if (showPinLabels) {
+        const badgeText = formatPinBadgeLabel(val);
+        const badgeMarker = L.marker([loc.lat, loc.lng], {
+          interactive: false,
+          icon: L.divIcon({
+            className: 'map-pin-badge-wrap',
+            iconSize: [0, 0],
+            html: `<span class="map-pin-badge ${val === 0 ? 'map-pin-badge--zero' : ''}">${badgeText}</span>`,
+          }),
+        });
+        badgeMarker.addTo(layer);
+      }
+
       bounds.push([loc.lat, loc.lng]);
     }
 
@@ -389,7 +495,19 @@ export default function OutletMapView({
         map.setView(bounds[0], 13);
       }
     }
-  }, [scopedOutlets, locationByName, getMetricValue, mapMetric, hourFilter, selectedOutletName, panelTab]);
+  }, [
+    scopedOutlets,
+    locationByName,
+    getMetricValue,
+    getScopedTrxAndOmset,
+    formatPinBadgeLabel,
+    activeTimeLabel,
+    showPinLabels,
+    mapMetric,
+    hourFilter,
+    selectedOutletName,
+    panelTab,
+  ]);
 
   const handleFitAllPins = () => {
     const map = mapInstanceRef.current;
@@ -619,6 +737,19 @@ export default function OutletMapView({
 
           <button
             type="button"
+            onClick={() => setShowPinLabels((v) => !v)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-bold transition-colors ${
+              showPinLabels
+                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
+                : 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+            }`}
+            title="Tampilkan angka nilai langsung di atas titik peta"
+          >
+            <span>Angka di Titik: {showPinLabels ? 'ON' : 'OFF'}</span>
+          </button>
+
+          <button
+            type="button"
             onClick={handleFitAllPins}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition-colors"
           >
@@ -628,50 +759,94 @@ export default function OutletMapView({
         </div>
       </div>
 
-      {/* Hour Slider Bar */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl px-4 py-3 flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2 text-xs font-bold text-slate-300 shrink-0">
-          <Clock className="w-4 h-4 text-amber-400" />
-          <span>Pergerakan Jam Sibuk:</span>
+      {/* Hour Slider & Shift Filter Bar */}
+      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl px-4 py-3 space-y-2.5">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-slate-300 shrink-0 mr-1">
+            <Clock className="w-4 h-4 text-amber-400" />
+            <span>Pergerakan Jam & Shift:</span>
+          </div>
+
+          {[
+            { id: 'all', label: 'Semua (24J)' },
+            { id: 'shift_pagi', label: 'Pagi (06–11)' },
+            { id: 'shift_siang', label: 'Siang (12–16)' },
+            { id: 'shift_sore', label: 'Sore (17–20)' },
+            { id: 'shift_malam', label: 'Malam (21–23)' },
+          ].map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                setIsPlayingHours(false);
+                setHourFilter(p.id);
+              }}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                hourFilter === p.id
+                  ? 'bg-amber-500 text-slate-950'
+                  : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+
+          <button
+            type="button"
+            onClick={() => setIsPlayingHours((p) => !p)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
+            title="Putar animasi transaksi per jam"
+          >
+            {isPlayingHours ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+            <span>{isPlayingHours ? 'Pause' : 'Play Jam'}</span>
+          </button>
+
+          <input
+            type="range"
+            min="0"
+            max="23"
+            value={typeof hourFilter === 'number' ? hourFilter : 12}
+            onChange={(e) => {
+              setIsPlayingHours(false);
+              setHourFilter(Number(e.target.value));
+            }}
+            className="flex-1 min-w-[140px] accent-indigo-500 cursor-pointer"
+          />
+
+          <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-indigo-300">
+            {activeTimeLabel}
+          </span>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setHourFilter('all')}
-          className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-            hourFilter === 'all'
-              ? 'bg-amber-500 text-slate-950'
-              : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
-          }`}
-        >
-          Semua (24 Jam)
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setIsPlayingHours((p) => !p)}
-          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold"
-          title="Putar animasi transaksi per jam"
-        >
-          {isPlayingHours ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-          <span>{isPlayingHours ? 'Pause' : 'Play Jam'}</span>
-        </button>
-
-        <input
-          type="range"
-          min="0"
-          max="23"
-          value={hourFilter === 'all' ? 12 : hourFilter}
-          onChange={(e) => {
-            setIsPlayingHours(false);
-            setHourFilter(Number(e.target.value));
-          }}
-          className="flex-1 min-w-[140px] accent-indigo-500 cursor-pointer"
-        />
-
-        <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-indigo-300">
-          {hourFilter === 'all' ? '00:00 – 23:59' : `${String(hourFilter).padStart(2, '0')}:00`}
-        </span>
+        {/* Top 5 Active Branches in Selected Hour / Shift */}
+        {topActiveOutlets.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-800/80 text-[11px]">
+            <span className="font-bold text-slate-400 mr-1">
+              Top Cabang ({activeTimeLabel}):
+            </span>
+            {topActiveOutlets.map(({ outlet, scoped }, idx) => (
+              <button
+                key={outlet.outletName}
+                type="button"
+                onClick={() => {
+                  setSelectedOutletName(outlet.outletName);
+                  setPanelTab('habit');
+                  const loc = locationByName.get(outlet.outletName.trim().toUpperCase());
+                  if (loc && mapInstanceRef.current) {
+                    mapInstanceRef.current.setView([loc.lat, loc.lng], 14);
+                  }
+                }}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors"
+              >
+                <span className="text-amber-400 font-bold">#{idx + 1}</span>
+                <span className="font-semibold">{outlet.outletName}</span>
+                <span className="text-indigo-300 font-mono font-bold">
+                  ({formatNumber(scoped.trx)} Trx)
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Main Split: Left Map + Right Coordinate & Habit Panel */}

@@ -357,3 +357,28 @@ html.dark .leaflet-control-attribution {
 html.dark .leaflet-control-attribution a {
   color: #818cf8 !important;
 }
+
+/* Centered number badge on map pins */
+.map-pin-badge-wrap {
+  background: transparent !important;
+  border: none !important;
+  pointer-events: none !important;
+}
+.map-pin-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85), 0 0 4px rgba(0, 0, 0, 0.65);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.map-pin-badge--zero {
+  color: rgba(226, 232, 240, 0.7);
+  font-weight: 600;
+}
