@@ -382,3 +382,76 @@ html.dark .leaflet-control-attribution a {
   color: rgba(226, 232, 240, 0.7);
   font-weight: 600;
 }
+
+/* Compact Pill Pin Mode */
+.map-pill-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transform: translate(-50%, -135%);
+  padding: 2px 6px;
+  border-radius: 9999px;
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  color: #ffffff;
+  background: rgba(15, 23, 42, 0.88);
+  border: 1.5px solid rgba(255, 255, 255, 0.65);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
+  white-space: nowrap;
+  pointer-events: none;
+}
+.map-pill-badge--kbb {
+  background: rgba(4, 120, 87, 0.92);
+}
+.map-pill-badge--plc {
+  background: rgba(67, 56, 202, 0.92);
+}
+.map-pill-badge--zero {
+  background: rgba(51, 65, 85, 0.78);
+  color: #cbd5e1;
+}
+
+/* Auto-Cluster Marker */
+.map-cluster-wrap {
+  background: transparent !important;
+  border: none !important;
+  pointer-events: auto !important;
+}
+.map-cluster-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 4px;
+  border-radius: 9999px;
+  font-family: 'Inter', sans-serif;
+  color: #ffffff;
+  background: radial-gradient(circle at 30% 30%, #6366f1, #312e81);
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.45);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.map-cluster-count {
+  font-size: 9px;
+  font-weight: 700;
+  opacity: 0.9;
+  line-height: 1;
+}
+.map-cluster-val {
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+/* Heatmap Glow Blob */
+.map-heat-blob {
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  pointer-events: none;
+  filter: blur(8px);
+}

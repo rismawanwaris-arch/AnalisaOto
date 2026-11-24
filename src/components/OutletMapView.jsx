@@ -93,10 +93,12 @@ export default function OutletMapView({
 
   // Map visualization controls
   const [mapMetric, setMapMetric] = useState('trx'); // 'trx' | 'omset' | 'komisi' | 'growth' | 'repeat'
+  const [mapStyleMode, setMapStyleMode] = useState('cluster'); // 'cluster' | 'pill' | 'bubble' | 'heat'
   const [clusterFilter, setClusterFilter] = useState('official'); // 'official' | 'plc' | 'kbb' | 'all'
   const [hourFilter, setHourFilter] = useState('all'); // 'all' | 'shift_pagi' | 'shift_siang' | 'shift_sore' | 'shift_malam' | 0..23
   const [isPlayingHours, setIsPlayingHours] = useState(false);
   const [showPinLabels, setShowPinLabels] = useState(true);
+  const [mapZoom, setMapZoom] = useState(DEFAULT_ZOOM);
 
   // Right panel mode: 'input' | 'habit' | 'bulk'
   const [panelTab, setPanelTab] = useState('input');
@@ -231,10 +233,14 @@ export default function OutletMapView({
     tileLayerRef.current = tileLayer;
     markersLayerRef.current = markersLayer;
 
+    const handleZoom = () => setMapZoom(map.getZoom());
+    map.on('zoomend', handleZoom);
+
     // Ensure proper sizing after mount
     setTimeout(() => map.invalidateSize(), 150);
 
     return () => {
+      map.off('zoomend', handleZoom);
       map.remove();
       mapInstanceRef.current = null;
       tileLayerRef.current = null;
@@ -284,7 +290,15 @@ export default function OutletMapView({
 
     const lat = Number(formLat);
     const lng = Number(formLng);
-    if (panelTab === 'input' && isValidLatLng(lat, lng)) {
+    const existing = selectedOutletName
+      ? locationByName.get(selectedOutletName.trim().toUpperCase())
+      : null;
+    const isSameAsSaved =
+      existing &&
+      Math.abs(Number(existing.lat) - lat) < 1e-6 &&
+      Math.abs(Number(existing.lng) - lng) < 1e-6;
+
+    if (panelTab === 'input' && isValidLatLng(lat, lng) && !isSameAsSaved) {
       const marker = L.circleMarker([lat, lng], {
         radius: 10,
         color: '#f59e0b',
@@ -298,7 +312,7 @@ export default function OutletMapView({
       });
       draftMarkerRef.current = marker;
     }
-  }, [formLat, formLng, panelTab, selectedOutletName]);
+  }, [formLat, formLng, panelTab, selectedOutletName, locationByName]);
 
   const SHIFT_RANGES = useMemo(
     () => ({
@@ -396,7 +410,7 @@ export default function OutletMapView({
       .slice(0, 5);
   }, [scopedOutlets, getScopedTrxAndOmset, getMetricValue]);
 
-  // Render saved pins onto Leaflet markersLayer
+  // Render saved pins onto Leaflet markersLayer (supports Cluster, Pin Ringkas, Bubble, Heatmap)
   useEffect(() => {
     const map = mapInstanceRef.current;
     const layer = markersLayerRef.current;
@@ -418,33 +432,38 @@ export default function OutletMapView({
       .filter(Boolean);
 
     const maxVal = Math.max(1, ...pinnedItems.map((i) => Math.abs(i.val)));
-    const bounds = [];
 
-    for (const { outlet, loc, val, scoped } of pinnedItems) {
-      const ratio = Math.min(1, Math.max(0.15, Math.abs(val) / maxVal));
-      const radius = val === 0 && hourFilter !== 'all' ? 11 : Math.round(11 + ratio * 17);
-
-      let color = '#6366f1'; // PLC default indigo
+    const getPinColor = (outlet, val) => {
       if (mapMetric === 'growth') {
-        color = val > 0 ? '#10b981' : val < 0 ? '#f43f5e' : '#64748b';
-      } else if (hourFilter !== 'all' && val === 0) {
-        color = '#64748b';
-      } else if (outlet.groupId === 'out_kbb') {
-        color = '#10b981';
-      } else if (outlet.groupId === 'non_plc_kbb') {
-        color = '#64748b';
+        return val > 0 ? '#10b981' : val < 0 ? '#f43f5e' : '#64748b';
       }
+      if (hourFilter !== 'all' && val === 0) return '#64748b';
+      if (outlet.groupId === 'out_kbb') return '#10b981';
+      if (outlet.groupId === 'non_plc_kbb') return '#64748b';
+      return '#6366f1';
+    };
 
+    const renderSinglePin = ({ outlet, latLng, val, scoped, compact = false }) => {
+      const ratio = Math.min(1, Math.max(0.15, Math.abs(val) / maxVal));
+      const color = getPinColor(outlet, val);
       const isSelected =
         String(outlet.outletName || '').trim().toUpperCase() ===
         String(selectedOutletName || '').trim().toUpperCase();
 
-      const circle = L.circleMarker([loc.lat, loc.lng], {
+      // Adaptive radius for Bubble vs Compact dot
+      const zoomScale = mapZoom <= 11 ? 0.65 : mapZoom <= 13 ? 0.85 : 1.05;
+      const radius = compact
+        ? 6
+        : val === 0 && hourFilter !== 'all'
+        ? 8
+        : Math.round((7 + ratio * 15) * zoomScale);
+
+      const circle = L.circleMarker(latLng, {
         radius,
         color: isSelected ? '#f59e0b' : '#ffffff',
         weight: isSelected ? 3 : 1.5,
         fillColor: color,
-        fillOpacity: hourFilter !== 'all' && val === 0 ? 0.35 : 0.85,
+        fillOpacity: hourFilter !== 'all' && val === 0 ? 0.35 : compact ? 0.92 : 0.68,
       });
 
       const habit = outlet.customerHabit || {};
@@ -475,24 +494,180 @@ export default function OutletMapView({
 
       if (showPinLabels) {
         const badgeText = formatPinBadgeLabel(val);
-        const badgeMarker = L.marker([loc.lat, loc.lng], {
+        if (compact) {
+          const shortCode =
+            outlet.outletCode && outlet.outletCode !== '-' ? `${outlet.outletCode} • ` : '';
+          const groupCls =
+            val === 0
+              ? 'map-pill-badge--zero'
+              : outlet.groupId === 'out_kbb'
+              ? 'map-pill-badge--kbb'
+              : 'map-pill-badge--plc';
+          L.marker(latLng, {
+            interactive: false,
+            icon: L.divIcon({
+              className: 'map-pin-badge-wrap',
+              iconSize: [0, 0],
+              html: `<span class="map-pill-badge ${groupCls}">${shortCode}${badgeText}</span>`,
+            }),
+          }).addTo(layer);
+        } else {
+          L.marker(latLng, {
+            interactive: false,
+            icon: L.divIcon({
+              className: 'map-pin-badge-wrap',
+              iconSize: [0, 0],
+              html: `<span class="map-pin-badge ${val === 0 ? 'map-pin-badge--zero' : ''}">${badgeText}</span>`,
+            }),
+          }).addTo(layer);
+        }
+      }
+    };
+
+    if (mapStyleMode === 'heat') {
+      // Mode 4: Heatmap glow blobs + small clickable dots
+      for (const item of pinnedItems) {
+        const ratio = Math.min(1, Math.max(0.1, Math.abs(item.val) / maxVal));
+        const size = Math.round(36 + ratio * 64);
+        const heatColor =
+          item.val === 0
+            ? 'rgba(100, 116, 139, 0.22)'
+            : ratio >= 0.7
+            ? 'rgba(239, 68, 68, 0.78)'
+            : ratio >= 0.35
+            ? 'rgba(245, 158, 11, 0.72)'
+            : 'rgba(56, 189, 248, 0.62)';
+
+        L.marker([item.loc.lat, item.loc.lng], {
           interactive: false,
           icon: L.divIcon({
             className: 'map-pin-badge-wrap',
             iconSize: [0, 0],
-            html: `<span class="map-pin-badge ${val === 0 ? 'map-pin-badge--zero' : ''}">${badgeText}</span>`,
+            html: `<div class="map-heat-blob" style="width:${size}px;height:${size}px;background:radial-gradient(circle, ${heatColor} 0%, rgba(0,0,0,0) 72%);"></div>`,
           }),
+        }).addTo(layer);
+
+        renderSinglePin({
+          ...item,
+          latLng: [item.loc.lat, item.loc.lng],
+          compact: true,
         });
-        badgeMarker.addTo(layer);
+      }
+    } else if (mapStyleMode === 'cluster') {
+      // Mode 1: Screen-space pixel clustering (merges nearby branches when zoomed out, spiderfies at zoom >= 16)
+      const thresholdPx = 46;
+      const points = pinnedItems.map((item) => ({
+        item,
+        pt: map.latLngToLayerPoint([item.loc.lat, item.loc.lng]),
+      }));
+      const visited = new Set();
+      const clusters = [];
+
+      for (let i = 0; i < points.length; i++) {
+        if (visited.has(i)) continue;
+        visited.add(i);
+        const group = [points[i]];
+        for (let j = i + 1; j < points.length; j++) {
+          if (visited.has(j)) continue;
+          const dx = points[i].pt.x - points[j].pt.x;
+          const dy = points[i].pt.y - points[j].pt.y;
+          if (Math.hypot(dx, dy) <= thresholdPx) {
+            visited.add(j);
+            group.push(points[j]);
+          }
+        }
+        clusters.push(group);
       }
 
-      bounds.push([loc.lat, loc.lng]);
-    }
+      for (const group of clusters) {
+        if (group.length === 1) {
+          const { item } = group[0];
+          renderSinglePin({
+            ...item,
+            latLng: [item.loc.lat, item.loc.lng],
+            compact: true,
+          });
+        } else if (mapZoom >= 16) {
+          // Spiderfy overlapping pins in a small neat ring at deep zoom
+          const avgLat = group.reduce((s, g) => s + g.item.loc.lat, 0) / group.length;
+          const avgLng = group.reduce((s, g) => s + g.item.loc.lng, 0) / group.length;
+          const centerPt = map.latLngToLayerPoint([avgLat, avgLng]);
+          const ringRadiusPx = 28 + group.length * 4;
 
-    if (bounds.length > 0 && panelTab !== 'input') {
-      // Only auto-fit when viewing pins (avoid jumping while picking points)
-      if (bounds.length === 1) {
-        map.setView(bounds[0], 13);
+          group.forEach((g, idx) => {
+            const angle = (2 * Math.PI * idx) / group.length;
+            const offsetPt = L.point(
+              centerPt.x + ringRadiusPx * Math.cos(angle),
+              centerPt.y + ringRadiusPx * Math.sin(angle)
+            );
+            const spiderLatLng = map.layerPointToLatLng(offsetPt);
+            L.polyline([[avgLat, avgLng], spiderLatLng], {
+              color: '#94a3b8',
+              weight: 1.5,
+              dashArray: '3 3',
+            }).addTo(layer);
+            renderSinglePin({
+              ...g.item,
+              latLng: [spiderLatLng.lat, spiderLatLng.lng],
+              compact: true,
+            });
+          });
+        } else {
+          // Render cluster badge
+          const avgLat = group.reduce((s, g) => s + g.item.loc.lat, 0) / group.length;
+          const avgLng = group.reduce((s, g) => s + g.item.loc.lng, 0) / group.length;
+          const totalVal = group.reduce((s, g) => s + g.item.val, 0);
+          const sumDisplay =
+            mapMetric === 'growth' || mapMetric === 'repeat'
+              ? `${(totalVal / group.length).toFixed(1)}%`
+              : formatPinBadgeLabel(totalVal);
+
+          const clusterMarker = L.marker([avgLat, avgLng], {
+            icon: L.divIcon({
+              className: 'map-cluster-wrap',
+              iconSize: [52, 52],
+              iconAnchor: [26, 26],
+              html: `<div class="map-cluster-badge">
+                <span class="map-cluster-count">${group.length} Cabang</span>
+                <span class="map-cluster-val">${sumDisplay}</span>
+              </div>`,
+            }),
+          });
+
+          const listHtml = group
+            .slice(0, 6)
+            .map(
+              (g) =>
+                `<div style="font-size:11px">• ${g.item.outlet.outletName}: <b>${formatPinBadgeLabel(g.item.val)}</b></div>`
+            )
+            .join('');
+          clusterMarker.bindTooltip(
+            `<div style="min-width:170px;font-family:Inter,sans-serif">
+              <div style="font-weight:800;font-size:12px;margin-bottom:3px">${group.length} Cabang Berdekatan</div>
+              ${listHtml}
+              ${group.length > 6 ? `<div style="font-size:10px;opacity:0.75">+${group.length - 6} cabang lainnya...</div>` : ''}
+              <div style="font-size:10px;color:#0ea5e9;margin-top:4px">Klik untuk zoom & pecah titik</div>
+            </div>`,
+            { direction: 'top', sticky: true }
+          );
+
+          clusterMarker.on('click', (e) => {
+            L.DomEvent.stopPropagation(e);
+            map.setView([avgLat, avgLng], Math.min(18, map.getZoom() + 2));
+          });
+
+          clusterMarker.addTo(layer);
+        }
+      }
+    } else {
+      // Mode 2 ('pill') or Mode 3 ('bubble')
+      const compact = mapStyleMode === 'pill';
+      for (const item of pinnedItems) {
+        renderSinglePin({
+          ...item,
+          latLng: [item.loc.lat, item.loc.lng],
+          compact,
+        });
       }
     }
   }, [
@@ -504,6 +679,8 @@ export default function OutletMapView({
     activeTimeLabel,
     showPinLabels,
     mapMetric,
+    mapStyleMode,
+    mapZoom,
     hourFilter,
     selectedOutletName,
     panelTab,
@@ -724,6 +901,29 @@ export default function OutletMapView({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Map Style Mode Switcher */}
+          <div className="inline-flex rounded-lg bg-slate-950/70 p-0.5 border border-slate-800">
+            {[
+              { id: 'cluster', label: 'Cluster' },
+              { id: 'pill', label: 'Pin Ringkas' },
+              { id: 'bubble', label: 'Bubble' },
+              { id: 'heat', label: 'Heatmap' },
+            ].map((st) => (
+              <button
+                key={st.id}
+                type="button"
+                onClick={() => setMapStyleMode(st.id)}
+                className={`px-2.5 py-1 rounded-md text-xs font-bold transition-colors ${
+                  mapStyleMode === st.id
+                    ? 'bg-cyan-600 text-white'
+                    : 'text-slate-300 hover:text-white'
+                }`}
+              >
+                {st.label}
+              </button>
+            ))}
+          </div>
+
           <select
             value={clusterFilter}
             onChange={(e) => setClusterFilter(e.target.value)}
