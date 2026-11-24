@@ -34,6 +34,10 @@ import {
   getDetectedProductsCatalog,
   getUploadHistory,
   addUploadRecord,
+  getOutletLocations,
+  saveOutletLocation,
+  saveOutletLocationsBulk,
+  deleteOutletLocation,
 } from './storage.js';
 import {
   parseExcelBuffer,
@@ -67,7 +71,14 @@ app.use(
         scriptSrc: ["'self'", "'unsafe-inline'"],
         styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
-        imgSrc: ["'self'", 'data:', 'blob:'],
+        imgSrc: [
+          "'self'",
+          'data:',
+          'blob:',
+          'https://tile.openstreetmap.org',
+          'https://*.tile.openstreetmap.org',
+          'https://*.basemaps.cartocdn.com',
+        ],
         connectSrc: ["'self'"],
         frameAncestors: ["'none'"],
         upgradeInsecureRequests: null,
@@ -793,7 +804,112 @@ app.get('/api/transactions', (req, res) => {
   }
 });
 
-// 12. Download bundled sample Excel files (disabled in production unless ENABLE_DEMO_TOOLS=true)
+// 12. Outlet Map Locations CRUD (Coordinates & Branch Pins)
+app.get('/api/outlet-locations', (req, res) => {
+  try {
+    res.json({ locations: getOutletLocations() });
+  } catch (err) {
+    return safeServerError(res, err);
+  }
+});
+
+app.post('/api/outlet-locations', requireRole('admin', 'analyst'), (req, res) => {
+  try {
+    const { outletName, outletCode, lat, lng, address, city, notes } = req.body || {};
+    const name = String(outletName || '').trim();
+    const parsedLat = Number(lat);
+    const parsedLng = Number(lng);
+    if (!name) {
+      return res.status(400).json({ error: 'Nama cabang wajib dipilih.' });
+    }
+    if (!Number.isFinite(parsedLat) || parsedLat < -90 || parsedLat > 90) {
+      return res.status(400).json({ error: 'Latitude harus berupa angka valid (-90 s/d 90).' });
+    }
+    if (!Number.isFinite(parsedLng) || parsedLng < -180 || parsedLng > 180) {
+      return res.status(400).json({ error: 'Longitude harus berupa angka valid (-180 s/d 180).' });
+    }
+    const saved = saveOutletLocation({
+      outletName: name,
+      outletCode,
+      lat: parsedLat,
+      lng: parsedLng,
+      address,
+      city,
+      notes,
+    });
+    res.json({ success: true, location: saved, locations: getOutletLocations() });
+  } catch (err) {
+    return safeServerError(res, err);
+  }
+});
+
+app.post('/api/outlet-locations/bulk', requireRole('admin', 'analyst'), (req, res) => {
+  try {
+    const { entries } = req.body || {};
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({ error: 'Daftar koordinat (entries) tidak boleh kosong.' });
+    }
+    const result = saveOutletLocationsBulk(entries);
+    res.json({ success: true, ...result });
+  } catch (err) {
+    return safeServerError(res, err);
+  }
+});
+
+app.delete('/api/outlet-locations/:outletName', requireRole('admin', 'analyst'), (req, res) => {
+  try {
+    const outletName = decodeURIComponent(req.params.outletName || '');
+    const locations = deleteOutletLocation(outletName);
+    res.json({ success: true, locations });
+  } catch (err) {
+    return safeServerError(res, err);
+  }
+});
+
+// 12.5 Local OpenStreetMap Tile Proxy (with in-memory cache & compliant User-Agent)
+const tileCache = new Map(); // "z/x/y" -> Buffer
+app.get('/api/map-tiles/:z/:x/:y.png', async (req, res) => {
+  const z = parseInt(req.params.z, 10);
+  const x = parseInt(req.params.x, 10);
+  const y = parseInt(req.params.y, 10);
+  if (
+    !Number.isInteger(z) || z < 0 || z > 19 ||
+    !Number.isInteger(x) || x < 0 ||
+    !Number.isInteger(y) || y < 0
+  ) {
+    return res.status(400).end();
+  }
+  const key = `${z}/${x}/${y}`;
+  if (tileCache.has(key)) {
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(tileCache.get(key));
+  }
+  try {
+    const upstream = await fetch(`https://tile.openstreetmap.org/${key}.png`, {
+      headers: {
+        'User-Agent': 'AnalisaOto/1.0 (ZimaOS Private Dashboard)',
+        Accept: 'image/png,*/*',
+      },
+    });
+    if (!upstream.ok) {
+      return res.status(upstream.status).end();
+    }
+    const buf = Buffer.from(await upstream.arrayBuffer());
+    if (tileCache.size >= 500) {
+      const oldestKey = tileCache.keys().next().value;
+      tileCache.delete(oldestKey);
+    }
+    tileCache.set(key, buf);
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    return res.send(buf);
+  } catch {
+    return res.status(502).end();
+  }
+});
+
+// 13. Download bundled sample Excel files (disabled in production unless ENABLE_DEMO_TOOLS=true)
 app.get('/api/sample-files/:name', (req, res) => {
   if (!ENABLE_DEMO_TOOLS) {
     return res.status(403).json({

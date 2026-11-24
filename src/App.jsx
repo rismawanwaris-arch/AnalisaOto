@@ -1351,6 +1351,7 @@ export default function App() {
               period={analytics?.period || {}}
               compactMode={false}
               initialSubTab={selectedOutletSubTab}
+              userRole={authState.role}
             />
           )}
 

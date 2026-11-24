@@ -14,11 +14,13 @@ const TX_DIR = path.join(DATA_DIR, 'transactions');
 const CATEGORIES_FILE = path.join(DATA_DIR, 'categories.json');
 const RULES_FILE = path.join(DATA_DIR, 'rules.json');
 const UPLOADS_FILE = path.join(DATA_DIR, 'uploads.json');
+const OUTLET_LOCATIONS_FILE = path.join(DATA_DIR, 'outlet-locations.json');
 
 // In-memory caches to eliminate repeated full-disk JSON parsing on every request
 const txCache = new Map(); // safeDate -> transactions[]
 let categoriesCache = null;
 let rulesCache = null;
+let outletLocationsCache = null;
 let datesSummaryCache = null;
 let globalUncatCache = null;
 
@@ -308,6 +310,84 @@ export function getDetectedProductsCatalog() {
   }
 
   return Array.from(catalog.values()).sort((a, b) => b.totalOmset - a.totalOmset || b.frequency - a.frequency);
+}
+
+/**
+ * Outlet Map Locations (Coordinates & Metadata)
+ */
+export function getOutletLocations() {
+  if (outletLocationsCache) {
+    return [...outletLocationsCache];
+  }
+  ensureDirectories();
+  const data = readJson(OUTLET_LOCATIONS_FILE, []);
+  const list = Array.isArray(data) ? data : [];
+  outletLocationsCache = list;
+  return [...list];
+}
+
+export function saveOutletLocation(entry) {
+  const list = getOutletLocations();
+  const key = String(entry.outletName || '').trim().toUpperCase();
+  const normalized = {
+    outletName: String(entry.outletName || '').trim(),
+    outletCode: String(entry.outletCode || '-').trim(),
+    lat: Number(entry.lat),
+    lng: Number(entry.lng),
+    address: String(entry.address || '').trim(),
+    city: String(entry.city || '').trim(),
+    notes: String(entry.notes || '').trim(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  const idx = list.findIndex((item) => String(item.outletName || '').trim().toUpperCase() === key);
+  if (idx >= 0) {
+    list[idx] = normalized;
+  } else {
+    list.push(normalized);
+  }
+  writeJsonAtomic(OUTLET_LOCATIONS_FILE, list);
+  outletLocationsCache = [...list];
+  return normalized;
+}
+
+export function saveOutletLocationsBulk(entries) {
+  const list = getOutletLocations();
+  const byKey = new Map(
+    list.map((item) => [String(item.outletName || '').trim().toUpperCase(), item])
+  );
+  let savedCount = 0;
+  for (const entry of entries) {
+    const name = String(entry.outletName || '').trim();
+    const lat = Number(entry.lat);
+    const lng = Number(entry.lng);
+    if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) continue;
+    byKey.set(name.toUpperCase(), {
+      outletName: name,
+      outletCode: String(entry.outletCode || '-').trim(),
+      lat,
+      lng,
+      address: String(entry.address || '').trim(),
+      city: String(entry.city || '').trim(),
+      notes: String(entry.notes || '').trim(),
+      updatedAt: new Date().toISOString(),
+    });
+    savedCount++;
+  }
+  const nextList = Array.from(byKey.values());
+  writeJsonAtomic(OUTLET_LOCATIONS_FILE, nextList);
+  outletLocationsCache = [...nextList];
+  return { savedCount, locations: nextList };
+}
+
+export function deleteOutletLocation(outletName) {
+  const key = String(outletName || '').trim().toUpperCase();
+  const list = getOutletLocations();
+  const next = list.filter((item) => String(item.outletName || '').trim().toUpperCase() !== key);
+  writeJsonAtomic(OUTLET_LOCATIONS_FILE, next);
+  outletLocationsCache = [...next];
+  return next;
 }
 
 /**

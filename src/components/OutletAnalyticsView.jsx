@@ -27,6 +27,7 @@ import {
   formatPercent,
   useAnimatedNumber,
 } from '../utils/format.js';
+import OutletMapView from './OutletMapView.jsx';
 
 export default function OutletAnalyticsView({
   outletAnalytics = {},
@@ -34,6 +35,7 @@ export default function OutletAnalyticsView({
   compactMode = false,
   onNavigateToFullOutletView,
   initialSubTab = 'overview_plc_kbb',
+  userRole = 'admin',
 }) {
   const kpi = outletAnalytics?.kpi || {};
   const groupComparison = outletAnalytics?.outletGroupComparison || [];
@@ -556,6 +558,12 @@ export default function OutletAnalyticsView({
             badge: `${allOutlets.length} Cabang`,
             color: 'slate',
           },
+          {
+            id: 'map_view',
+            label: '6. Peta & Habit Lokasi',
+            badge: 'Maps',
+            color: 'cyan',
+          },
         ].map((tab) => {
           const active = subMenuTab === tab.id;
           return (
@@ -985,6 +993,15 @@ export default function OutletAnalyticsView({
           'Diurutkan dari cabang dengan Omset D1 tertinggi ke terendah.',
           '#6366f1'
         )}
+
+      {/* ISI SUB-MENU 6: PETA SEBARAN CABANG & HABIT PELANGGAN */}
+      {subMenuTab === 'map_view' && (
+        <OutletMapView
+          allOutlets={allOutlets}
+          onInspectOutlet={(outlet) => setInspectedOutlet(outlet)}
+          canEdit={userRole === 'admin' || userRole === 'analyst'}
+        />
+      )}
 
       {/* 360° DEEP-DIVE SINGLE OUTLET INSPECTION MODAL (Rendered via Portal on document.body to avoid parent transform containing-block bug) */}
       {inspectedOutlet &&

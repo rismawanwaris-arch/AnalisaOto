@@ -334,3 +334,26 @@ html.light .shadow-xl,
 html.light .shadow-2xl {
   box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.12), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
 }
+
+/* Leaflet Map Dark Mode Styling (OpenStreetMap tiles without API key) */
+html.dark .leaflet-tile-pane {
+  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+}
+html.dark .leaflet-container {
+  background: #0f172a;
+}
+html.dark .leaflet-control-zoom a {
+  background-color: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+html.dark .leaflet-control-zoom a:hover {
+  background-color: #334155 !important;
+}
+html.dark .leaflet-control-attribution {
+  background-color: rgba(15, 23, 42, 0.8) !important;
+  color: #94a3b8 !important;
+}
+html.dark .leaflet-control-attribution a {
+  color: #818cf8 !important;
+}

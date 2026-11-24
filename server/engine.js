@@ -844,6 +844,7 @@ export function computeComparisonAnalytics({
             komisi: 0,
             byCategory: new Map(),
             byProduct: new Map(),
+            customerCounts: new Map(),
             hourly: Array.from({ length: 24 }, (_, hr) => ({
               hour: hr,
               label: `${String(hr).padStart(2, '0')}:00`,
@@ -872,6 +873,10 @@ export function computeComparisonAnalytics({
         }
         rEntry.hourly[h].trx++;
         rEntry.hourly[h].omset += tx.hrgJual;
+        const custKey = String(tx.tujuan || '').trim();
+        if (custKey && custKey !== '-' && custKey !== '<null>') {
+          rEntry.customerCounts.set(custKey, (rEntry.customerCounts.get(custKey) || 0) + 1);
+        }
 
         // Per-outlet category breakdown
         if (!rEntry.byCategory.has(catId)) {
@@ -941,6 +946,7 @@ export function computeComparisonAnalytics({
             komisi: 0,
             byCategory: new Map(),
             byProduct: new Map(),
+            customerCounts: new Map(),
             hourly: Array.from({ length: 24 }, (_, hr) => ({
               hour: hr,
               label: `${String(hr).padStart(2, '0')}:00`,
@@ -1377,6 +1383,41 @@ export function computeComparisonAnalytics({
     }));
     const peakHourObj = [...outletHourly].sort((a, b) => b.trxD1 - a.trxD1 || b.omsetD1 - a.omsetD1)[0];
 
+    // Customer habit aggregation for D1
+    const custMapD1 = r1?.customerCounts;
+    let uniqueCustomersD1 = 0;
+    let repeatCustomersD1 = 0;
+    if (custMapD1 && custMapD1.size > 0) {
+      uniqueCustomersD1 = custMapD1.size;
+      for (const cnt of custMapD1.values()) {
+        if (cnt >= 2) repeatCustomersD1++;
+      }
+    }
+    const repeatRateD1 = uniqueCustomersD1 > 0
+      ? Number(((repeatCustomersD1 / uniqueCustomersD1) * 100).toFixed(1))
+      : 0;
+    const avgTicketSizeD1 = trxD1 > 0 ? Math.round(omsetD1 / trxD1) : 0;
+
+    // Dominant time-of-day habit slot
+    const slots = [
+      { label: 'Dini Hari (00-05)', from: 0, to: 5 },
+      { label: 'Pagi (06-11)', from: 6, to: 11 },
+      { label: 'Siang (12-16)', from: 12, to: 16 },
+      { label: 'Sore & Malam (17-23)', from: 17, to: 23 },
+    ];
+    let dominantTimeSlotD1 = '-';
+    let bestSlotTrx = 0;
+    for (const s of slots) {
+      let sum = 0;
+      for (let hr = s.from; hr <= s.to; hr++) {
+        sum += outletHourly[hr]?.trxD1 || 0;
+      }
+      if (sum > bestSlotTrx) {
+        bestSlotTrx = sum;
+        dominantTimeSlotD1 = s.label;
+      }
+    }
+
     const outletItem = {
       reseller: rName,
       outletName: rName,
@@ -1406,6 +1447,14 @@ export function computeComparisonAnalytics({
       komisiD2,
       shareServerPct: aggD1.omset > 0 ? Number(((omsetD1 / aggD1.omset) * 100).toFixed(2)) : 0,
       peakHour: peakHourObj?.trxD1 > 0 ? `${peakHourObj.label} (${peakHourObj.trxD1} Trx)` : '-',
+      customerHabit: {
+        uniqueCustomersD1,
+        repeatCustomersD1,
+        repeatRateD1,
+        avgTicketSizeD1,
+        dominantTimeSlotD1,
+        topCategoryD1: outletCatBreakdown[0]?.trxD1 > 0 ? outletCatBreakdown[0].name : '-',
+      },
       categoryBreakdown: outletCatBreakdown,
       topProducts: outletTopProducts.slice(0, 12),
       hourlyComparison: outletHourly,
