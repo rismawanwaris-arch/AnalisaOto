@@ -29,6 +29,8 @@ import {
   useAnimatedNumber,
 } from '../utils/format.js';
 import OutletMapView from './OutletMapView.jsx';
+import { sortArray, toggleSortConfig } from '../utils/sort.js';
+import SortableTh from './SortableTh.jsx';
 
 export default function OutletAnalyticsView({
   outletAnalytics = {},
@@ -50,6 +52,8 @@ export default function OutletAnalyticsView({
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedOutlets, setExpandedOutlets] = useState({});
   const [inspectedOutlet, setInspectedOutlet] = useState(null);
+  const [outletSort, setOutletSort] = useState({ key: 'omsetD1', dir: 'desc' });
+  const [modalCatSort, setModalCatSort] = useState({ key: 'omsetD1', dir: 'desc' });
 
   useEffect(() => {
     if (initialSubTab) {
@@ -178,7 +182,9 @@ export default function OutletAnalyticsView({
     );
   };
 
-  const renderOutletTable = (outletsList, title, subtitle, accentColor = '#6366f1') => (
+  const renderOutletTable = (outletsList, title, subtitle, accentColor = '#6366f1') => {
+    const sortedOutlets = sortArray(outletsList, outletSort);
+    return (
     <div className="bg-slate-900/90 border border-slate-800/90 rounded-2xl shadow-xl overflow-hidden animate-fade-in">
       <div className="px-6 py-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-4">
         <div>
@@ -203,19 +209,76 @@ export default function OutletAnalyticsView({
           <thead>
             <tr className="bg-slate-950 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
               <th className="py-3.5 px-4 w-12">No</th>
-              <th className="py-3.5 px-4 min-w-[250px]">Nama Cabang & Klaster</th>
-              <th className="py-3.5 px-3 text-center">Kode ID</th>
-              <th className="py-3.5 px-4 text-right">Omset D1 ({period?.d1Label})</th>
-              <th className="py-3.5 px-4 text-right">Omset D2 ({period?.d2Label})</th>
-              <th className="py-3.5 px-4 text-right">Selisih (Rp)</th>
-              <th className="py-3.5 px-3 text-right">Trx D1</th>
-              <th className="py-3.5 px-3 text-right">Komisi D1</th>
-              <th className="py-3.5 px-3 text-center">Tren DoD</th>
+              <SortableTh
+                label="Nama Cabang & Klaster"
+                sortKey="outletName"
+                sortConfig={outletSort}
+                onSort={(k, d) => setOutletSort((prev) => toggleSortConfig(prev, k, d))}
+                defaultDir="asc"
+                className="py-3.5 px-4 min-w-[250px]"
+              />
+              <SortableTh
+                label="Kode ID"
+                sortKey="outletCode"
+                sortConfig={outletSort}
+                onSort={(k, d) => setOutletSort((prev) => toggleSortConfig(prev, k, d))}
+                align="center"
+                defaultDir="asc"
+                className="py-3.5 px-3"
+              />
+              <SortableTh
+                label={`Omset D1 (${period?.d1Label || ''})`}
+                sortKey="omsetD1"
+                sortConfig={outletSort}
+                onSort={(k, d) => setOutletSort((prev) => toggleSortConfig(prev, k, d))}
+                align="right"
+                className="py-3.5 px-4"
+              />
+              <SortableTh
+                label={`Omset D2 (${period?.d2Label || ''})`}
+                sortKey="omsetD2"
+                sortConfig={outletSort}
+                onSort={(k, d) => setOutletSort((prev) => toggleSortConfig(prev, k, d))}
+                align="right"
+                className="py-3.5 px-4"
+              />
+              <SortableTh
+                label="Selisih (Rp)"
+                sortKey="selisihRp"
+                sortConfig={outletSort}
+                onSort={(k, d) => setOutletSort((prev) => toggleSortConfig(prev, k, d))}
+                align="right"
+                className="py-3.5 px-4"
+              />
+              <SortableTh
+                label="Trx D1"
+                sortKey="trxD1"
+                sortConfig={outletSort}
+                onSort={(k, d) => setOutletSort((prev) => toggleSortConfig(prev, k, d))}
+                align="right"
+                className="py-3.5 px-3"
+              />
+              <SortableTh
+                label="Komisi D1"
+                sortKey="komisiD1"
+                sortConfig={outletSort}
+                onSort={(k, d) => setOutletSort((prev) => toggleSortConfig(prev, k, d))}
+                align="right"
+                className="py-3.5 px-3"
+              />
+              <SortableTh
+                label="Tren DoD"
+                sortKey="selisihPct"
+                sortConfig={outletSort}
+                onSort={(k, d) => setOutletSort((prev) => toggleSortConfig(prev, k, d))}
+                align="center"
+                className="py-3.5 px-3"
+              />
               <th className="py-3.5 px-4 text-right">Aksi Analisa</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800/80">
-            {outletsList.map((outlet, idx) => {
+            {sortedOutlets.map((outlet, idx) => {
               const isExpanded = !!expandedOutlets[outlet.outletName];
               return (
                 <React.Fragment key={outlet.outletName}>
@@ -367,7 +430,8 @@ export default function OutletAnalyticsView({
         </table>
       </div>
     </div>
-  );
+    );
+  };
 
   return (
     <div className="space-y-6 animate-fade-in-up">
@@ -1106,17 +1170,66 @@ export default function OutletAnalyticsView({
                     <table className="w-full text-left text-xs tabular-nums">
                       <thead>
                         <tr className="border-b border-slate-800 text-slate-400 whitespace-nowrap">
-                          <th className="py-2 px-3">Kategori Produk</th>
-                          <th className="py-2 px-3 text-right">Omset D1</th>
-                          <th className="py-2 px-3 text-right">Omset D2</th>
-                          <th className="py-2 px-3 text-right">Selisih (Rp)</th>
-                          <th className="py-2 px-3 text-right">Trx D1</th>
-                          <th className="py-2 px-3 text-right">Porsi Cabang</th>
-                          <th className="py-2 px-3 text-center">Tren</th>
+                          <SortableTh
+                            label="Kategori Produk"
+                            sortKey="name"
+                            sortConfig={modalCatSort}
+                            onSort={(k, d) => setModalCatSort((prev) => toggleSortConfig(prev, k, d))}
+                            defaultDir="asc"
+                            className="py-2 px-3"
+                          />
+                          <SortableTh
+                            label="Omset D1"
+                            sortKey="omsetD1"
+                            sortConfig={modalCatSort}
+                            onSort={(k, d) => setModalCatSort((prev) => toggleSortConfig(prev, k, d))}
+                            align="right"
+                            className="py-2 px-3"
+                          />
+                          <SortableTh
+                            label="Omset D2"
+                            sortKey="omsetD2"
+                            sortConfig={modalCatSort}
+                            onSort={(k, d) => setModalCatSort((prev) => toggleSortConfig(prev, k, d))}
+                            align="right"
+                            className="py-2 px-3"
+                          />
+                          <SortableTh
+                            label="Selisih (Rp)"
+                            sortKey="selisihRp"
+                            sortConfig={modalCatSort}
+                            onSort={(k, d) => setModalCatSort((prev) => toggleSortConfig(prev, k, d))}
+                            align="right"
+                            className="py-2 px-3"
+                          />
+                          <SortableTh
+                            label="Trx D1"
+                            sortKey="trxD1"
+                            sortConfig={modalCatSort}
+                            onSort={(k, d) => setModalCatSort((prev) => toggleSortConfig(prev, k, d))}
+                            align="right"
+                            className="py-2 px-3"
+                          />
+                          <SortableTh
+                            label="Porsi Cabang"
+                            sortKey="sharePct"
+                            sortConfig={modalCatSort}
+                            onSort={(k, d) => setModalCatSort((prev) => toggleSortConfig(prev, k, d))}
+                            align="right"
+                            className="py-2 px-3"
+                          />
+                          <SortableTh
+                            label="Tren"
+                            sortKey="selisihPct"
+                            sortConfig={modalCatSort}
+                            onSort={(k, d) => setModalCatSort((prev) => toggleSortConfig(prev, k, d))}
+                            align="center"
+                            className="py-2 px-3"
+                          />
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60">
-                        {(inspectedOutlet.categoryBreakdown || []).map((cb) => (
+                        {sortArray(inspectedOutlet.categoryBreakdown || [], modalCatSort).map((cb) => (
                           <tr key={cb.categoryId}>
                             <td className="py-2.5 px-3 font-bold text-white">
                               <div className="flex items-center gap-2">

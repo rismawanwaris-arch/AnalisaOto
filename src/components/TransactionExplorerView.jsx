@@ -10,6 +10,8 @@ import {
 } from 'lucide-react';
 import { formatRupiah, formatNumber, formatFullDateIndo } from '../utils/format.js';
 import { apiFetch } from '../utils/api.js';
+import { toggleSortConfig } from '../utils/sort.js';
+import SortableTh from './SortableTh.jsx';
 
 export default function TransactionExplorerView({
   datesSummary = [],
@@ -22,6 +24,7 @@ export default function TransactionExplorerView({
   const [selectedCat, setSelectedCat] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'tglEntri', dir: 'desc' });
   const [page, setPage] = useState(1);
   const [data, setData] = useState({ items: [], total: 0, totalPages: 1 });
   const [loading, setLoading] = useState(false);
@@ -34,6 +37,8 @@ export default function TransactionExplorerView({
         categoryId: selectedCat,
         status: selectedStatus,
         search: searchQuery,
+        sortBy: sortConfig.key,
+        sortDir: sortConfig.dir,
         page: String(page),
         limit: '50',
       });
@@ -50,7 +55,12 @@ export default function TransactionExplorerView({
 
   useEffect(() => {
     fetchTransactions();
-  }, [selectedDate, selectedCat, selectedStatus, page]);
+  }, [selectedDate, selectedCat, selectedStatus, sortConfig, page]);
+
+  const handleSort = (key, defaultDir = 'desc') => {
+    setSortConfig((prev) => toggleSortConfig(prev, key, defaultDir));
+    setPage(1);
+  };
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
@@ -176,17 +186,17 @@ export default function TransactionExplorerView({
           <table className="w-full text-left border-collapse text-xs tabular-nums">
             <thead className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase">
               <tr>
-                <th className="py-3 px-4">Waktu Entri</th>
-                <th className="py-3 px-3">Produk</th>
-                <th className="py-3 px-3">Kategori / Sub</th>
-                <th className="py-3 px-3">Tujuan</th>
-                <th className="py-3 px-3">Nama Reseller</th>
-                <th className="py-3 px-3">Modul Supplier</th>
-                <th className="py-3 px-3 text-right">Hrg. Beli</th>
-                <th className="py-3 px-3 text-right">Hrg. Jual</th>
-                <th className="py-3 px-3 text-right">Komisi</th>
-                <th className="py-3 px-3 text-right">Laba</th>
-                <th className="py-3 px-4 text-center">Status</th>
+                <SortableTh label="Waktu Entri" sortKey="tglEntri" sortConfig={sortConfig} onSort={handleSort} className="py-3 px-4" />
+                <SortableTh label="Produk" sortKey="produk" sortConfig={sortConfig} onSort={handleSort} defaultDir="asc" className="py-3 px-3" />
+                <SortableTh label="Kategori / Sub" sortKey="subCategory" sortConfig={sortConfig} onSort={handleSort} defaultDir="asc" className="py-3 px-3" />
+                <SortableTh label="Tujuan" sortKey="tujuan" sortConfig={sortConfig} onSort={handleSort} defaultDir="asc" className="py-3 px-3" />
+                <SortableTh label="Nama Reseller" sortKey="reseller" sortConfig={sortConfig} onSort={handleSort} defaultDir="asc" className="py-3 px-3" />
+                <SortableTh label="Modul Supplier" sortKey="modul" sortConfig={sortConfig} onSort={handleSort} defaultDir="asc" className="py-3 px-3" />
+                <SortableTh label="Hrg. Beli" sortKey="hrgBeli" sortConfig={sortConfig} onSort={handleSort} align="right" className="py-3 px-3" />
+                <SortableTh label="Hrg. Jual" sortKey="hrgJual" sortConfig={sortConfig} onSort={handleSort} align="right" className="py-3 px-3" />
+                <SortableTh label="Komisi" sortKey="komisi" sortConfig={sortConfig} onSort={handleSort} align="right" className="py-3 px-3" />
+                <SortableTh label="Laba" sortKey="laba" sortConfig={sortConfig} onSort={handleSort} align="right" className="py-3 px-3" />
+                <SortableTh label="Status" sortKey="status" sortConfig={sortConfig} onSort={handleSort} align="center" defaultDir="asc" className="py-3 px-4" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70">

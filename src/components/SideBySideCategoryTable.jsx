@@ -12,6 +12,8 @@ import {
   Filter,
 } from 'lucide-react';
 import { formatRupiah, formatCompactRupiah, formatNumber, formatPercent } from '../utils/format.js';
+import { sortArray, toggleSortConfig } from '../utils/sort.js';
+import SortableTh from './SortableTh.jsx';
 
 export default function SideBySideCategoryTable({
   categoryComparison = [],
@@ -21,6 +23,7 @@ export default function SideBySideCategoryTable({
 }) {
   const [selectedCatFilter, setSelectedCatFilter] = useState(initialCategoryId || 'ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: null, dir: 'desc' });
   const [expandedCats, setExpandedCats] = useState({
     cat_transfer_bank: true,
     cat_ewallet: true,
@@ -41,9 +44,13 @@ export default function SideBySideCategoryTable({
     [categoryComparison, selectedCatFilter]
   );
 
+  const handleSort = (key, defaultDir = 'desc') => {
+    setSortConfig((prev) => toggleSortConfig(prev, key, defaultDir));
+  };
+
   const filteredCategories = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return categoryComparison
+    const filtered = categoryComparison
       .filter((c) => selectedCatFilter === 'ALL' || c.categoryId === selectedCatFilter)
       .map((c) => {
         if (!q) return c;
@@ -61,7 +68,20 @@ export default function SideBySideCategoryTable({
         return { ...c, subCategories: matchedSubs };
       })
       .filter((c) => !q || (c.subCategories && c.subCategories.length > 0));
-  }, [categoryComparison, selectedCatFilter, searchQuery]);
+
+    if (!sortConfig.key) return filtered;
+
+    const sortedCats = sortArray(filtered, sortConfig);
+    return sortedCats.map((cat) => ({
+      ...cat,
+      subCategories: sortArray(cat.subCategories || [], sortConfig).map((sub) => ({
+        ...sub,
+        products: sortArray(sub.products || [], sortConfig, {
+          name: (p) => p.produk,
+        }),
+      })),
+    }));
+  }, [categoryComparison, selectedCatFilter, searchQuery, sortConfig]);
 
   const toggleCategory = (catId) => {
     setExpandedCats((prev) => ({
@@ -334,15 +354,78 @@ export default function SideBySideCategoryTable({
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-950/90 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                <th className="py-3.5 px-5 min-w-[260px]">Kategori / Sub-Kategori / Produk</th>
-                <th className="py-3.5 px-4 text-right">Omset D1 ({period?.d1Label})</th>
-                <th className="py-3.5 px-4 text-right">Omset D2 ({period?.d2Label})</th>
-                <th className="py-3.5 px-4 text-right">Selisih (Rp)</th>
-                <th className="py-3.5 px-3 text-right">Selisih (%)</th>
-                <th className="py-3.5 px-3 text-right">Trx D1</th>
-                <th className="py-3.5 px-3 text-right">Trx D2</th>
-                <th className="py-3.5 px-3 text-right">Laba D1</th>
-                <th className="py-3.5 px-4 text-center">Tren</th>
+                <SortableTh
+                  label="Kategori / Sub-Kategori / Produk"
+                  sortKey="name"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                  defaultDir="asc"
+                  className="py-3.5 px-5 min-w-[260px]"
+                />
+                <SortableTh
+                  label={`Omset D1 (${period?.d1Label || ''})`}
+                  sortKey="omsetD1"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                  align="right"
+                  className="py-3.5 px-4"
+                />
+                <SortableTh
+                  label={`Omset D2 (${period?.d2Label || ''})`}
+                  sortKey="omsetD2"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                  align="right"
+                  className="py-3.5 px-4"
+                />
+                <SortableTh
+                  label="Selisih (Rp)"
+                  sortKey="selisihRp"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                  align="right"
+                  className="py-3.5 px-4"
+                />
+                <SortableTh
+                  label="Selisih (%)"
+                  sortKey="selisihPct"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                  align="right"
+                  className="py-3.5 px-3"
+                />
+                <SortableTh
+                  label="Trx D1"
+                  sortKey="trxD1"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                  align="right"
+                  className="py-3.5 px-3"
+                />
+                <SortableTh
+                  label="Trx D2"
+                  sortKey="trxD2"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                  align="right"
+                  className="py-3.5 px-3"
+                />
+                <SortableTh
+                  label="Laba D1"
+                  sortKey="labaD1"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                  align="right"
+                  className="py-3.5 px-3"
+                />
+                <SortableTh
+                  label="Tren"
+                  sortKey="selisihPct"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                  align="center"
+                  className="py-3.5 px-4"
+                />
               </tr>
             </thead>
 

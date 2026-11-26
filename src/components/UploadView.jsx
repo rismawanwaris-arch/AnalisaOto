@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { formatRupiah, formatNumber, formatFullDateIndo } from '../utils/format.js';
 import { apiFetch } from '../utils/api.js';
+import { sortArray, toggleSortConfig } from '../utils/sort.js';
+import SortableTh from './SortableTh.jsx';
 
 export default function UploadView({
   datesSummary = [],
@@ -28,6 +30,11 @@ export default function UploadView({
   onOpenWizard,
 }) {
   const [uploadMode, setUploadMode] = useState('single'); // 'single' | 'batch'
+  const [dateSort, setDateSort] = useState({ key: 'date', dir: 'desc' });
+  const sortedDatesSummary = useMemo(
+    () => sortArray(datesSummary, dateSort),
+    [datesSummary, dateSort]
+  );
   const [writeMode, setWriteMode] = useState('replace'); // 'replace' | 'append'
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
@@ -425,18 +432,66 @@ export default function UploadView({
           <table className="w-full text-left border-collapse text-xs tabular-nums">
             <thead>
               <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase">
-                <th className="py-3 px-4">Tanggal Kalender</th>
-                <th className="py-3 px-4 text-right">Total Baris Trx</th>
-                <th className="py-3 px-4 text-right">Trx Sukses</th>
-                <th className="py-3 px-4 text-right">Trx Gagal</th>
-                <th className="py-3 px-4 text-right">Total Omset (Rp)</th>
-                <th className="py-3 px-4 text-right">Laba Bersih</th>
-                <th className="py-3 px-4 text-center">Status Kategori</th>
+                <SortableTh
+                  label="Tanggal Kalender"
+                  sortKey="date"
+                  sortConfig={dateSort}
+                  onSort={(k, d) => setDateSort((prev) => toggleSortConfig(prev, k, d))}
+                  className="py-3 px-4"
+                />
+                <SortableTh
+                  label="Total Baris Trx"
+                  sortKey="totalTrx"
+                  sortConfig={dateSort}
+                  onSort={(k, d) => setDateSort((prev) => toggleSortConfig(prev, k, d))}
+                  align="right"
+                  className="py-3 px-4"
+                />
+                <SortableTh
+                  label="Trx Sukses"
+                  sortKey="suksesTrx"
+                  sortConfig={dateSort}
+                  onSort={(k, d) => setDateSort((prev) => toggleSortConfig(prev, k, d))}
+                  align="right"
+                  className="py-3 px-4"
+                />
+                <SortableTh
+                  label="Trx Gagal"
+                  sortKey="gagalTrx"
+                  sortConfig={dateSort}
+                  onSort={(k, d) => setDateSort((prev) => toggleSortConfig(prev, k, d))}
+                  align="right"
+                  className="py-3 px-4"
+                />
+                <SortableTh
+                  label="Total Omset (Rp)"
+                  sortKey="omset"
+                  sortConfig={dateSort}
+                  onSort={(k, d) => setDateSort((prev) => toggleSortConfig(prev, k, d))}
+                  align="right"
+                  className="py-3 px-4"
+                />
+                <SortableTh
+                  label="Laba Bersih"
+                  sortKey="laba"
+                  sortConfig={dateSort}
+                  onSort={(k, d) => setDateSort((prev) => toggleSortConfig(prev, k, d))}
+                  align="right"
+                  className="py-3 px-4"
+                />
+                <SortableTh
+                  label="Status Kategori"
+                  sortKey="uncategorizedProductCount"
+                  sortConfig={dateSort}
+                  onSort={(k, d) => setDateSort((prev) => toggleSortConfig(prev, k, d))}
+                  align="center"
+                  className="py-3 px-4"
+                />
                 <th className="py-3 px-4 text-right">Tindakan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70">
-              {datesSummary.map((d) => (
+              {sortedDatesSummary.map((d) => (
                 <tr key={d.date} className="hover:bg-slate-950/60">
                   <td className="py-3.5 px-4">
                     <div className="font-bold text-sm text-white">

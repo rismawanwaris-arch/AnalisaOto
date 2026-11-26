@@ -2104,6 +2104,7 @@ export function computeCustomerHabitAnalytics({
   minTrx = 2,
   search = '',
   sortBy = 'trx_desc',
+  sortDir = 'desc',
   page = 1,
   limit = 50,
 }) {
@@ -2455,17 +2456,40 @@ export function computeCustomerHabitAnalytics({
     return true;
   });
 
-  if (sortBy === 'omset_desc') {
-    filteredCustomers.sort((a, b) => b.totalOmset - a.totalOmset || b.totalTrx - a.totalTrx);
-  } else if (sortBy === 'active_days_desc') {
-    filteredCustomers.sort((a, b) => b.activeDays - a.activeDays || b.totalTrx - a.totalTrx || b.totalOmset - a.totalOmset);
-  } else if (sortBy === 'avg_per_day_desc') {
-    filteredCustomers.sort((a, b) => b.maxTrxInOneDay - a.maxTrxInOneDay || b.totalTrx - a.totalTrx);
-  } else if (sortBy === 'multi_outlet_desc') {
-    filteredCustomers.sort((a, b) => b.globalOutletCount - a.globalOutletCount || b.totalTrx - a.totalTrx);
-  } else {
-    filteredCustomers.sort((a, b) => b.totalTrx - a.totalTrx || b.totalOmset - a.totalOmset);
-  }
+  const dirSign = String(sortDir || 'desc').toLowerCase() === 'asc' ? 1 : -1;
+  const HABIT_SEGMENT_RANK = {
+    vip_power: 5,
+    rutin_harian: 4,
+    rutin_mingguan: 3,
+    repeat_harian: 2,
+    reguler: 1,
+  };
+
+  filteredCustomers.sort((a, b) => {
+    let cmp = 0;
+    if (sortBy === 'omset_desc' || sortBy === 'totalOmset') {
+      cmp = a.totalOmset - b.totalOmset || a.totalTrx - b.totalTrx;
+    } else if (sortBy === 'active_days_desc' || sortBy === 'activeDays') {
+      cmp = a.activeDays - b.activeDays || a.totalTrx - b.totalTrx || a.totalOmset - b.totalOmset;
+    } else if (sortBy === 'avg_per_day_desc' || sortBy === 'maxTrxInOneDay') {
+      cmp = a.maxTrxInOneDay - b.maxTrxInOneDay || a.totalTrx - b.totalTrx;
+    } else if (sortBy === 'multi_outlet_desc' || sortBy === 'globalOutletCount') {
+      cmp = a.globalOutletCount - b.globalOutletCount || a.totalTrx - b.totalTrx;
+    } else if (sortBy === 'tujuan') {
+      cmp = String(a.tujuan || '').localeCompare(String(b.tujuan || ''), 'id', { numeric: true, sensitivity: 'base' });
+    } else if (sortBy === 'primaryOutlet') {
+      cmp = String(a.primaryOutlet || '').localeCompare(String(b.primaryOutlet || ''), 'id', { numeric: true, sensitivity: 'base' });
+    } else if (sortBy === 'habitSegment') {
+      cmp = (HABIT_SEGMENT_RANK[a.habitSegment] || 0) - (HABIT_SEGMENT_RANK[b.habitSegment] || 0) || a.totalTrx - b.totalTrx;
+    } else if (sortBy === 'peakHour') {
+      cmp = String(a.peakHour || '').localeCompare(String(b.peakHour || ''), 'id', { numeric: true, sensitivity: 'base' });
+    } else if (sortBy === 'topProduct') {
+      cmp = String(a.topProduct || '').localeCompare(String(b.topProduct || ''), 'id', { numeric: true, sensitivity: 'base' });
+    } else {
+      cmp = a.totalTrx - b.totalTrx || a.totalOmset - b.totalOmset;
+    }
+    return cmp * dirSign;
+  });
 
   const pageNum = Math.max(1, parseInt(page, 10) || 1);
   const limitNum = Math.max(10, Math.min(200, parseInt(limit, 10) || 50));

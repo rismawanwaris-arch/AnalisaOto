@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { formatRupiah, formatNumber } from '../utils/format.js';
 import { apiFetch } from '../utils/api.js';
+import { sortArray, toggleSortConfig } from '../utils/sort.js';
+import SortableTh from './SortableTh.jsx';
 
 export default function RulesSettingsView({
   categories = [],
@@ -29,6 +31,8 @@ export default function RulesSettingsView({
   const [subTab, setSubTab] = useState('rules'); // 'rules' | 'products' | 'categories'
   const [filterCatId, setFilterCatId] = useState('ALL');
   const [searchQuery, setSearchQuery] = useState('');
+  const [rulesSort, setRulesSort] = useState({ key: null, dir: 'asc' });
+  const [catalogSort, setCatalogSort] = useState({ key: 'totalOmset', dir: 'desc' });
 
   // Rule Form State
   const [editingRuleId, setEditingRuleId] = useState(null);
@@ -83,7 +87,7 @@ export default function RulesSettingsView({
 
   const filteredRules = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return rules.filter((r) => {
+    const filtered = rules.filter((r) => {
       if (filterCatId !== 'ALL' && r.categoryId !== filterCatId) return false;
       if (q) {
         const catName = categoriesMap.get(r.categoryId)?.name || '';
@@ -92,11 +96,17 @@ export default function RulesSettingsView({
       }
       return true;
     });
-  }, [rules, filterCatId, searchQuery, categoriesMap]);
+    return sortArray(filtered, rulesSort, {
+      categoryName: (r) => {
+        const cat = categoriesMap.get(r.categoryId);
+        return cat?.shortName || cat?.name || r.categoryId;
+      },
+    });
+  }, [rules, filterCatId, searchQuery, categoriesMap, rulesSort]);
 
   const filteredCatalog = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
-    return productCatalog.filter((p) => {
+    const filtered = productCatalog.filter((p) => {
       if (filterCatId !== 'ALL' && p.categoryId !== filterCatId) return false;
       if (q) {
         const hay = `${p.produk} ${p.modul} ${p.categoryName} ${p.subCategory}`.toLowerCase();
@@ -104,7 +114,13 @@ export default function RulesSettingsView({
       }
       return true;
     });
-  }, [productCatalog, filterCatId, searchQuery]);
+    return sortArray(filtered, catalogSort, {
+      categoryName: (item) => {
+        const cat = categoriesMap.get(item.categoryId);
+        return cat?.shortName || item.categoryName || '';
+      },
+    });
+  }, [productCatalog, filterCatId, searchQuery, catalogSort, categoriesMap]);
 
   // Handlers for Rules CRUD
   const handleSaveRule = async (e) => {
@@ -473,10 +489,38 @@ export default function RulesSettingsView({
               <table className="w-full text-left border-collapse text-xs">
                 <thead className="bg-slate-950 sticky top-0 border-b border-slate-800 text-slate-400 uppercase">
                   <tr>
-                    <th className="py-3.5 px-4">Pola Aturan</th>
-                    <th className="py-3.5 px-3">Tipe Pencocokan</th>
-                    <th className="py-3.5 px-4">Kategori Pilar</th>
-                    <th className="py-3.5 px-3">Sub-Kategori (Drilldown)</th>
+                    <SortableTh
+                      label="Pola Aturan"
+                      sortKey="pattern"
+                      sortConfig={rulesSort}
+                      onSort={(k, d) => setRulesSort((prev) => toggleSortConfig(prev, k, d))}
+                      defaultDir="asc"
+                      className="py-3.5 px-4"
+                    />
+                    <SortableTh
+                      label="Tipe Pencocokan"
+                      sortKey="matchType"
+                      sortConfig={rulesSort}
+                      onSort={(k, d) => setRulesSort((prev) => toggleSortConfig(prev, k, d))}
+                      defaultDir="asc"
+                      className="py-3.5 px-3"
+                    />
+                    <SortableTh
+                      label="Kategori Pilar"
+                      sortKey="categoryName"
+                      sortConfig={rulesSort}
+                      onSort={(k, d) => setRulesSort((prev) => toggleSortConfig(prev, k, d))}
+                      defaultDir="asc"
+                      className="py-3.5 px-4"
+                    />
+                    <SortableTh
+                      label="Sub-Kategori (Drilldown)"
+                      sortKey="subCategory"
+                      sortConfig={rulesSort}
+                      onSort={(k, d) => setRulesSort((prev) => toggleSortConfig(prev, k, d))}
+                      defaultDir="asc"
+                      className="py-3.5 px-3"
+                    />
                     <th className="py-3.5 px-4 text-right">Aksi</th>
                   </tr>
                 </thead>
@@ -568,13 +612,62 @@ export default function RulesSettingsView({
             <table className="w-full text-left border-collapse text-xs tabular-nums">
               <thead className="bg-slate-950 sticky top-0 border-b border-slate-800 text-slate-400 uppercase">
                 <tr>
-                  <th className="py-3.5 px-4">Kode Produk</th>
-                  <th className="py-3.5 px-3">Modul Supplier</th>
-                  <th className="py-3.5 px-3 text-right">Frekuensi Trx</th>
-                  <th className="py-3.5 px-4 text-right">Total Omset</th>
-                  <th className="py-3.5 px-4">Kategori Saat Ini</th>
-                  <th className="py-3.5 px-3">Sub-Kategori</th>
-                  <th className="py-3.5 px-3">Aturan Penangkap</th>
+                  <SortableTh
+                    label="Kode Produk"
+                    sortKey="produk"
+                    sortConfig={catalogSort}
+                    onSort={(k, d) => setCatalogSort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3.5 px-4"
+                  />
+                  <SortableTh
+                    label="Modul Supplier"
+                    sortKey="modul"
+                    sortConfig={catalogSort}
+                    onSort={(k, d) => setCatalogSort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Frekuensi Trx"
+                    sortKey="frequency"
+                    sortConfig={catalogSort}
+                    onSort={(k, d) => setCatalogSort((prev) => toggleSortConfig(prev, k, d))}
+                    align="right"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Total Omset"
+                    sortKey="totalOmset"
+                    sortConfig={catalogSort}
+                    onSort={(k, d) => setCatalogSort((prev) => toggleSortConfig(prev, k, d))}
+                    align="right"
+                    className="py-3.5 px-4"
+                  />
+                  <SortableTh
+                    label="Kategori Saat Ini"
+                    sortKey="categoryName"
+                    sortConfig={catalogSort}
+                    onSort={(k, d) => setCatalogSort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3.5 px-4"
+                  />
+                  <SortableTh
+                    label="Sub-Kategori"
+                    sortKey="subCategory"
+                    sortConfig={catalogSort}
+                    onSort={(k, d) => setCatalogSort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Aturan Penangkap"
+                    sortKey="matchedRulePattern"
+                    sortConfig={catalogSort}
+                    onSort={(k, d) => setCatalogSort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3.5 px-3"
+                  />
                   <th className="py-3.5 px-4 text-right">Tindakan</th>
                 </tr>
               </thead>

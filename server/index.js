@@ -748,6 +748,8 @@ app.get('/api/transactions', (req, res) => {
       categoryId,
       status,
       search = '',
+      sortBy = 'tglEntri',
+      sortDir = 'desc',
       page = 1,
       limit = 50,
     } = req.query;
@@ -787,7 +789,37 @@ app.get('/api/transactions', (req, res) => {
       });
     }
 
-    filtered.sort((a, b) => String(b.tglEntri).localeCompare(String(a.tglEntri)));
+    const dirSign = String(sortDir || 'desc').toLowerCase() === 'asc' ? 1 : -1;
+    const numericCols = new Set(['hrgBeli', 'hrgJual', 'komisi', 'laba']);
+    const stringCols = new Set([
+      'tglEntri',
+      'produk',
+      'subCategory',
+      'categoryName',
+      'tujuan',
+      'reseller',
+      'modul',
+      'status',
+    ]);
+    const activeSortKey = numericCols.has(String(sortBy)) || stringCols.has(String(sortBy))
+      ? String(sortBy)
+      : 'tglEntri';
+
+    filtered.sort((a, b) => {
+      let cmp = 0;
+      if (numericCols.has(activeSortKey)) {
+        cmp = (Number(a[activeSortKey]) || 0) - (Number(b[activeSortKey]) || 0);
+      } else {
+        cmp = String(a[activeSortKey] || '').localeCompare(String(b[activeSortKey] || ''), 'id', {
+          numeric: true,
+          sensitivity: 'base',
+        });
+      }
+      if (cmp === 0 && activeSortKey !== 'tglEntri') {
+        cmp = String(a.tglEntri || '').localeCompare(String(b.tglEntri || ''));
+      }
+      return cmp * dirSign;
+    });
 
     const pageNum = Math.max(1, parseInt(page, 10) || 1);
     const limitNum = Math.max(10, Math.min(500, parseInt(limit, 10) || 50));
@@ -880,6 +912,7 @@ app.get('/api/customer-habits', (req, res) => {
       minTrx = '2',
       search = '',
       sortBy = 'trx_desc',
+      sortDir = 'desc',
       page = '1',
       limit = '50',
     } = req.query;
@@ -915,6 +948,7 @@ app.get('/api/customer-habits', (req, res) => {
       minTrx,
       search: String(search || ''),
       sortBy: String(sortBy || 'trx_desc'),
+      sortDir: String(sortDir || 'desc').toLowerCase() === 'asc' ? 'asc' : 'desc',
       page,
       limit,
     });

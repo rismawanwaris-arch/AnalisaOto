@@ -18,6 +18,8 @@ import {
   formatNumber,
   formatPercent,
 } from '../utils/format.js';
+import { sortArray, toggleSortConfig } from '../utils/sort.js';
+import SortableTh from './SortableTh.jsx';
 
 export default function GrowthAndFailureSections({
   growth = {},
@@ -29,18 +31,23 @@ export default function GrowthAndFailureSections({
   const [showCount, setShowCount] = useState(5);
   const [failureBucketFilter, setFailureBucketFilter] = useState('ALL');
   const [failureSearch, setFailureSearch] = useState('');
+  const [moduleSort, setModuleSort] = useState({ key: 'omsetD1', dir: 'desc' });
+  const [failureSort, setFailureSort] = useState({ key: 'tglEntri', dir: 'desc' });
 
   const topProductGainers = (growth?.topProductGainers || []).slice(0, showCount);
   const topProductLosers = (growth?.topProductLosers || []).slice(0, showCount);
   const topResellerGainers = (growth?.topResellerGainers || []).slice(0, showCount);
   const topResellerLosers = (growth?.topResellerLosers || []).slice(0, showCount);
   const topResellersByOmset = (growth?.topResellersByOmsetD1 || []).slice(0, 8);
-  const modulePerformance = growth?.modulePerformance || [];
+  const modulePerformance = useMemo(
+    () => sortArray(growth?.modulePerformance || [], moduleSort),
+    [growth?.modulePerformance, moduleSort]
+  );
 
   const filteredFailureRecords = useMemo(() => {
     const records = failureAudit?.recordsD1 || [];
     const q = failureSearch.trim().toLowerCase();
-    return records.filter((r) => {
+    const filtered = records.filter((r) => {
       if (failureBucketFilter !== 'ALL' && r.bucket !== failureBucketFilter) return false;
       if (q) {
         const hay = `${r.produk} ${r.tujuan} ${r.reseller} ${r.modul} ${r.status}`.toLowerCase();
@@ -48,7 +55,8 @@ export default function GrowthAndFailureSections({
       }
       return true;
     });
-  }, [failureAudit, failureBucketFilter, failureSearch]);
+    return sortArray(filtered, failureSort);
+  }, [failureAudit, failureBucketFilter, failureSearch, failureSort]);
 
   const getBucketIcon = (id) => {
     if (id === 'stok_kosong') return <PackageX className="w-5 h-5 text-amber-400" />;
@@ -389,13 +397,62 @@ export default function GrowthAndFailureSections({
             <table className="w-full text-left border-collapse text-xs tabular-nums">
               <thead>
                 <tr className="bg-slate-950 border-b border-slate-800 text-slate-400 uppercase">
-                  <th className="py-3 px-4">Modul / Jalur Supplier</th>
-                  <th className="py-3 px-4 text-right">Omset D1</th>
-                  <th className="py-3 px-4 text-right">Omset D2</th>
-                  <th className="py-3 px-4 text-right">Trx Sukses D1</th>
-                  <th className="py-3 px-4 text-right">Trx Gagal D1</th>
-                  <th className="py-3 px-4 text-right">Success Rate</th>
-                  <th className="py-3 px-4 text-right">Laba Server D1</th>
+                  <SortableTh
+                    label="Modul / Jalur Supplier"
+                    sortKey="modul"
+                    sortConfig={moduleSort}
+                    onSort={(k, d) => setModuleSort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3 px-4"
+                  />
+                  <SortableTh
+                    label="Omset D1"
+                    sortKey="omsetD1"
+                    sortConfig={moduleSort}
+                    onSort={(k, d) => setModuleSort((prev) => toggleSortConfig(prev, k, d))}
+                    align="right"
+                    className="py-3 px-4"
+                  />
+                  <SortableTh
+                    label="Omset D2"
+                    sortKey="omsetD2"
+                    sortConfig={moduleSort}
+                    onSort={(k, d) => setModuleSort((prev) => toggleSortConfig(prev, k, d))}
+                    align="right"
+                    className="py-3 px-4"
+                  />
+                  <SortableTh
+                    label="Trx Sukses D1"
+                    sortKey="suksesTrxD1"
+                    sortConfig={moduleSort}
+                    onSort={(k, d) => setModuleSort((prev) => toggleSortConfig(prev, k, d))}
+                    align="right"
+                    className="py-3 px-4"
+                  />
+                  <SortableTh
+                    label="Trx Gagal D1"
+                    sortKey="gagalTrxD1"
+                    sortConfig={moduleSort}
+                    onSort={(k, d) => setModuleSort((prev) => toggleSortConfig(prev, k, d))}
+                    align="right"
+                    className="py-3 px-4"
+                  />
+                  <SortableTh
+                    label="Success Rate"
+                    sortKey="successRateD1"
+                    sortConfig={moduleSort}
+                    onSort={(k, d) => setModuleSort((prev) => toggleSortConfig(prev, k, d))}
+                    align="right"
+                    className="py-3 px-4"
+                  />
+                  <SortableTh
+                    label="Laba Server D1"
+                    sortKey="labaD1"
+                    sortConfig={moduleSort}
+                    onSort={(k, d) => setModuleSort((prev) => toggleSortConfig(prev, k, d))}
+                    align="right"
+                    className="py-3 px-4"
+                  />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/70">
@@ -558,13 +615,62 @@ export default function GrowthAndFailureSections({
           <table className="w-full text-left border-collapse text-xs tabular-nums">
             <thead className="bg-slate-950 sticky top-0 border-b border-slate-800 text-slate-400 uppercase">
               <tr>
-                <th className="py-2.5 px-4">Waktu Entri</th>
-                <th className="py-2.5 px-3">Kode Produk</th>
-                <th className="py-2.5 px-3">Nomor Tujuan</th>
-                <th className="py-2.5 px-3">Nama Reseller</th>
-                <th className="py-2.5 px-3">Modul Supplier</th>
-                <th className="py-2.5 px-3 text-right">Nilai Jual</th>
-                <th className="py-2.5 px-4 text-center">Status Kegagalan</th>
+                <SortableTh
+                  label="Waktu Entri"
+                  sortKey="tglEntri"
+                  sortConfig={failureSort}
+                  onSort={(k, d) => setFailureSort((prev) => toggleSortConfig(prev, k, d))}
+                  className="py-2.5 px-4"
+                />
+                <SortableTh
+                  label="Kode Produk"
+                  sortKey="produk"
+                  sortConfig={failureSort}
+                  onSort={(k, d) => setFailureSort((prev) => toggleSortConfig(prev, k, d))}
+                  defaultDir="asc"
+                  className="py-2.5 px-3"
+                />
+                <SortableTh
+                  label="Nomor Tujuan"
+                  sortKey="tujuan"
+                  sortConfig={failureSort}
+                  onSort={(k, d) => setFailureSort((prev) => toggleSortConfig(prev, k, d))}
+                  defaultDir="asc"
+                  className="py-2.5 px-3"
+                />
+                <SortableTh
+                  label="Nama Reseller"
+                  sortKey="reseller"
+                  sortConfig={failureSort}
+                  onSort={(k, d) => setFailureSort((prev) => toggleSortConfig(prev, k, d))}
+                  defaultDir="asc"
+                  className="py-2.5 px-3"
+                />
+                <SortableTh
+                  label="Modul Supplier"
+                  sortKey="modul"
+                  sortConfig={failureSort}
+                  onSort={(k, d) => setFailureSort((prev) => toggleSortConfig(prev, k, d))}
+                  defaultDir="asc"
+                  className="py-2.5 px-3"
+                />
+                <SortableTh
+                  label="Nilai Jual"
+                  sortKey="hrgJual"
+                  sortConfig={failureSort}
+                  onSort={(k, d) => setFailureSort((prev) => toggleSortConfig(prev, k, d))}
+                  align="right"
+                  className="py-2.5 px-3"
+                />
+                <SortableTh
+                  label="Status Kegagalan"
+                  sortKey="status"
+                  sortConfig={failureSort}
+                  onSort={(k, d) => setFailureSort((prev) => toggleSortConfig(prev, k, d))}
+                  align="center"
+                  defaultDir="asc"
+                  className="py-2.5 px-4"
+                />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/70">

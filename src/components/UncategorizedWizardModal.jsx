@@ -12,6 +12,8 @@ import {
   Info,
 } from 'lucide-react';
 import { formatRupiah, formatNumber } from '../utils/format.js';
+import { sortArray, toggleSortConfig } from '../utils/sort.js';
+import SortableTh from './SortableTh.jsx';
 
 export default function UncategorizedWizardModal({
   isOpen,
@@ -22,6 +24,7 @@ export default function UncategorizedWizardModal({
 }) {
   const items = uncategorizedReport?.items || [];
   const [rowsState, setRowsState] = useState([]);
+  const [wizardSort, setWizardSort] = useState({ key: 'frequency', dir: 'desc' });
   const [localCategories, setLocalCategories] = useState([]);
   const [newCategories, setNewCategories] = useState([]);
   const [showNewCatForm, setShowNewCatForm] = useState(false);
@@ -81,27 +84,36 @@ export default function UncategorizedWizardModal({
     return Array.from(map.values());
   }, [rowsState]);
 
+  const sortedRows = useMemo(
+    () => sortArray(rowsState, wizardSort),
+    [rowsState, wizardSort]
+  );
+
   if (!isOpen) return null;
 
-  const handleRowChange = (idx, field, value) => {
-    setRowsState((prev) => {
-      const next = [...prev];
-      const current = { ...next[idx], [field]: value };
+  const handleRowChange = (produk, field, value) => {
+    setRowsState((prev) =>
+      prev.map((row) => {
+        if (row.produk !== produk) return row;
+        const current = { ...row, [field]: value };
 
-      if (field === 'matchType') {
-        const sourceItem = items[idx];
-        if (value === 'prefix') {
-          current.pattern = sourceItem?.suggestedPrefix || current.produk.replace(/[0-9]+.*$/, '') || current.produk;
-        } else if (value === 'exact') {
-          current.pattern = current.produk;
-        } else if (value === 'module') {
-          current.pattern = current.modul;
+        if (field === 'matchType') {
+          const sourceItem = items.find((it) => it.produk === produk);
+          if (value === 'prefix') {
+            current.pattern =
+              sourceItem?.suggestedPrefix ||
+              current.produk.replace(/[0-9]+.*$/, '') ||
+              current.produk;
+          } else if (value === 'exact') {
+            current.pattern = current.produk;
+          } else if (value === 'module') {
+            current.pattern = current.modul;
+          }
         }
-      }
 
-      next[idx] = current;
-      return next;
-    });
+        return current;
+      })
+    );
   };
 
   const handleCreateLocalCategory = (e) => {
@@ -273,15 +285,43 @@ export default function UncategorizedWizardModal({
             <table className="w-full text-left border-collapse">
               <thead className="bg-slate-950/90 sticky top-0 z-10 border-b border-slate-800 text-xs font-semibold uppercase tracking-wider text-slate-400">
                 <tr>
-                  <th className="py-3.5 px-4">Kode Produk Baru</th>
-                  <th className="py-3.5 px-3">Sampel Tujuan</th>
-                  <th className="py-3.5 px-3 text-center">Frekuensi</th>
-                  <th className="py-3.5 px-3">Modul Supplier</th>
+                  <SortableTh
+                    label="Kode Produk Baru"
+                    sortKey="produk"
+                    sortConfig={wizardSort}
+                    onSort={(k, d) => setWizardSort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3.5 px-4"
+                  />
+                  <SortableTh
+                    label="Sampel Tujuan"
+                    sortKey="sampleTujuan"
+                    sortConfig={wizardSort}
+                    onSort={(k, d) => setWizardSort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Frekuensi"
+                    sortKey="frequency"
+                    sortConfig={wizardSort}
+                    onSort={(k, d) => setWizardSort((prev) => toggleSortConfig(prev, k, d))}
+                    align="center"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Modul Supplier"
+                    sortKey="modul"
+                    sortConfig={wizardSort}
+                    onSort={(k, d) => setWizardSort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3.5 px-3"
+                  />
                   <th className="py-3.5 px-4">Tindakan Pemetaan (Kategori & Pola Aturan)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80 text-sm">
-                {rowsState.map((row, idx) => (
+                {sortedRows.map((row) => (
                   <tr
                     key={row.produk}
                     className={`transition-colors ${
@@ -294,7 +334,7 @@ export default function UncategorizedWizardModal({
                         <input
                           type="checkbox"
                           checked={row.enabled}
-                          onChange={(e) => handleRowChange(idx, 'enabled', e.target.checked)}
+                          onChange={(e) => handleRowChange(row.produk, 'enabled', e.target.checked)}
                           className="w-4 h-4 rounded border-slate-600 text-indigo-500 focus:ring-indigo-500 bg-slate-800"
                         />
                         <div>
@@ -337,7 +377,7 @@ export default function UncategorizedWizardModal({
                           <label className="block text-[11px] text-slate-400 mb-1">Pilih Kategori Pilar:</label>
                           <select
                             value={row.categoryId}
-                            onChange={(e) => handleRowChange(idx, 'categoryId', e.target.value)}
+                            onChange={(e) => handleRowChange(row.produk, 'categoryId', e.target.value)}
                             className="w-full px-2.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs font-medium text-white focus:border-indigo-500 focus:outline-none"
                           >
                             {localCategories.map((c) => (
@@ -353,7 +393,7 @@ export default function UncategorizedWizardModal({
                           <label className="block text-[11px] text-slate-400 mb-1">Metode Pencocokan:</label>
                           <select
                             value={row.matchType}
-                            onChange={(e) => handleRowChange(idx, 'matchType', e.target.value)}
+                            onChange={(e) => handleRowChange(row.produk, 'matchType', e.target.value)}
                             className="w-full px-2.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs font-medium text-emerald-300 focus:border-indigo-500 focus:outline-none"
                           >
                             <option value="prefix">Prefix / Awalan ★</option>
@@ -374,7 +414,7 @@ export default function UncategorizedWizardModal({
                           <input
                             type="text"
                             value={row.pattern}
-                            onChange={(e) => handleRowChange(idx, 'pattern', e.target.value.toUpperCase())}
+                            onChange={(e) => handleRowChange(row.produk, 'pattern', e.target.value.toUpperCase())}
                             className="w-full px-2.5 py-2 rounded-lg bg-slate-950 border border-indigo-500/50 text-xs font-mono font-bold text-indigo-300 focus:border-indigo-400 focus:outline-none"
                           />
                         </div>
@@ -385,7 +425,7 @@ export default function UncategorizedWizardModal({
                           <input
                             type="text"
                             value={row.subCategory}
-                            onChange={(e) => handleRowChange(idx, 'subCategory', e.target.value)}
+                            onChange={(e) => handleRowChange(row.produk, 'subCategory', e.target.value)}
                             placeholder="Sub-kategori"
                             className="w-full px-2.5 py-2 rounded-lg bg-slate-950 border border-slate-700 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none"
                           />

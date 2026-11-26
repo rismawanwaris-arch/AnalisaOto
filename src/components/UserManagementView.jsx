@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   Users,
@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../utils/api.js';
 import { formatFullDateIndo } from '../utils/format.js';
+import { sortArray, toggleSortConfig } from '../utils/sort.js';
+import SortableTh from './SortableTh.jsx';
 
 const ROLE_META = {
   admin: {
@@ -40,6 +42,15 @@ export default function UserManagementView({ currentUsername, onToast }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [userSort, setUserSort] = useState({ key: 'username', dir: 'asc' });
+
+  const sortedUsers = useMemo(
+    () =>
+      sortArray(users, userSort, {
+        displayName: (u) => u.displayName || u.username || '',
+      }),
+    [users, userSort]
+  );
 
   // Create / Edit Modal State
   const [modalOpen, setModalOpen] = useState(false);
@@ -298,15 +309,42 @@ export default function UserManagementView({ currentUsername, onToast }) {
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-slate-950 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                <th className="py-3.5 px-5">Username & Nama Lengkap</th>
-                <th className="py-3.5 px-4">Role Akses</th>
-                <th className="py-3.5 px-4 text-center">Status Akun</th>
-                <th className="py-3.5 px-4">Login Terakhir</th>
+                <SortableTh
+                  label="Username & Nama Lengkap"
+                  sortKey="displayName"
+                  sortConfig={userSort}
+                  onSort={(k, d) => setUserSort((prev) => toggleSortConfig(prev, k, d))}
+                  defaultDir="asc"
+                  className="py-3.5 px-5"
+                />
+                <SortableTh
+                  label="Role Akses"
+                  sortKey="role"
+                  sortConfig={userSort}
+                  onSort={(k, d) => setUserSort((prev) => toggleSortConfig(prev, k, d))}
+                  defaultDir="asc"
+                  className="py-3.5 px-4"
+                />
+                <SortableTh
+                  label="Status Akun"
+                  sortKey="active"
+                  sortConfig={userSort}
+                  onSort={(k, d) => setUserSort((prev) => toggleSortConfig(prev, k, d))}
+                  align="center"
+                  className="py-3.5 px-4"
+                />
+                <SortableTh
+                  label="Login Terakhir"
+                  sortKey="lastLoginAt"
+                  sortConfig={userSort}
+                  onSort={(k, d) => setUserSort((prev) => toggleSortConfig(prev, k, d))}
+                  className="py-3.5 px-4"
+                />
                 <th className="py-3.5 px-5 text-right">Tindakan</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/80">
-              {users.map((u) => {
+              {sortedUsers.map((u) => {
                 const meta = ROLE_META[u.role] || ROLE_META.viewer;
                 const isSelf = u.username === currentUsername;
                 return (

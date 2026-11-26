@@ -34,6 +34,8 @@ import {
   formatShortDateIndo,
   useAnimatedNumber,
 } from '../utils/format.js';
+import { sortArray, toggleSortConfig } from '../utils/sort.js';
+import SortableTh from './SortableTh.jsx';
 
 const SEGMENT_BADGE_CLASSES = {
   vip_power: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
@@ -79,6 +81,9 @@ export default function CustomerHabitView({
   const [segmentFilter, setSegmentFilter] = useState('ALL');
   const [minTrx, setMinTrx] = useState(2);
   const [sortBy, setSortBy] = useState('trx_desc');
+  const [sortDir, setSortDir] = useState('desc');
+  const [outletSummarySort, setOutletSummarySort] = useState({ key: 'repeatCustomers', dir: 'desc' });
+  const [detailTxSort, setDetailTxSort] = useState({ key: 'tglEntri', dir: 'desc' });
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -142,6 +147,7 @@ export default function CustomerHabitView({
         minTrx: String(minTrx),
         search: searchQuery,
         sortBy,
+        sortDir,
         page: String(page),
         limit: '50',
       });
@@ -178,6 +184,7 @@ export default function CustomerHabitView({
     minTrx,
     searchQuery,
     sortBy,
+    sortDir,
     page,
   ]);
 
@@ -239,6 +246,28 @@ export default function CustomerHabitView({
   const pagination = habitData?.pagination || { total: 0, page: 1, limit: 50, totalPages: 1 };
   const outletSummaries = habitData?.outletSummaries || [];
   const availableOutlets = habitData?.availableOutlets || [];
+
+  const customerSortConfig = useMemo(() => ({ key: sortBy, dir: sortDir }), [sortBy, sortDir]);
+
+  const handleCustomerTableSort = (key, defaultDir = 'desc') => {
+    if (sortBy === key) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(key);
+      setSortDir(defaultDir);
+    }
+    setPage(1);
+  };
+
+  const sortedOutletSummaries = useMemo(
+    () => sortArray(outletSummaries, outletSummarySort),
+    [outletSummaries, outletSummarySort]
+  );
+
+  const sortedDetailTransactions = useMemo(
+    () => sortArray(detailModal.data?.transactions || [], detailTxSort),
+    [detailModal.data?.transactions, detailTxSort]
+  );
 
   const animUnique = useAnimatedNumber(summary.totalUniqueCustomers || 0);
   const animRepeat = useAnimatedNumber(summary.repeatCustomersCount || 0);
@@ -755,9 +784,14 @@ export default function CustomerHabitView({
                   Urutkan
                 </label>
                 <select
-                  value={sortBy}
+                  value={
+                    ['trx_desc', 'omset_desc', 'active_days_desc', 'avg_per_day_desc', 'multi_outlet_desc'].includes(sortBy)
+                      ? sortBy
+                      : 'custom'
+                  }
                   onChange={(e) => {
                     setSortBy(e.target.value);
+                    setSortDir('desc');
                     setPage(1);
                   }}
                   className="w-full px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-semibold text-white focus:border-indigo-500 focus:outline-none"
@@ -767,6 +801,9 @@ export default function CustomerHabitView({
                   <option value="active_days_desc">Hari Aktif Terbanyak</option>
                   <option value="avg_per_day_desc">Puncak Trx/Hari</option>
                   <option value="multi_outlet_desc">Outlet Terbanyak</option>
+                  <option value="custom" disabled hidden>
+                    Sesuai Kolom Tabel
+                  </option>
                 </select>
               </div>
             </div>
@@ -790,13 +827,62 @@ export default function CustomerHabitView({
               <thead>
                 <tr className="bg-slate-950 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">
                   <th className="py-3.5 px-4 w-12">No</th>
-                  <th className="py-3.5 px-4 min-w-[190px]">Nomor Tujuan & Tipe</th>
-                  <th className="py-3.5 px-4 min-w-[200px]">Outlet Utama & Loyalitas</th>
-                  <th className="py-3.5 px-3 text-center">Frekuensi</th>
-                  <th className="py-3.5 px-3 text-center">Segmen Habit</th>
-                  <th className="py-3.5 px-4 min-w-[165px]">Pola Waktu</th>
-                  <th className="py-3.5 px-4 min-w-[155px]">Produk Favorit</th>
-                  <th className="py-3.5 px-4 text-right">Total Omset</th>
+                  <SortableTh
+                    label="Nomor Tujuan & Tipe"
+                    sortKey="tujuan"
+                    sortConfig={customerSortConfig}
+                    onSort={handleCustomerTableSort}
+                    defaultDir="asc"
+                    className="py-3.5 px-4 min-w-[190px]"
+                  />
+                  <SortableTh
+                    label="Outlet Utama & Loyalitas"
+                    sortKey="primaryOutlet"
+                    sortConfig={customerSortConfig}
+                    onSort={handleCustomerTableSort}
+                    defaultDir="asc"
+                    className="py-3.5 px-4 min-w-[200px]"
+                  />
+                  <SortableTh
+                    label="Frekuensi"
+                    sortKey="trx_desc"
+                    sortConfig={customerSortConfig}
+                    onSort={handleCustomerTableSort}
+                    align="center"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Segmen Habit"
+                    sortKey="habitSegment"
+                    sortConfig={customerSortConfig}
+                    onSort={handleCustomerTableSort}
+                    align="center"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Pola Waktu"
+                    sortKey="peakHour"
+                    sortConfig={customerSortConfig}
+                    onSort={handleCustomerTableSort}
+                    defaultDir="asc"
+                    className="py-3.5 px-4 min-w-[165px]"
+                  />
+                  <SortableTh
+                    label="Produk Favorit"
+                    sortKey="topProduct"
+                    sortConfig={customerSortConfig}
+                    onSort={handleCustomerTableSort}
+                    defaultDir="asc"
+                    className="py-3.5 px-4 min-w-[155px]"
+                  />
+                  <SortableTh
+                    label="Total Omset"
+                    sortKey="omset_desc"
+                    sortConfig={customerSortConfig}
+                    onSort={handleCustomerTableSort}
+                    align="right"
+                    className="py-3.5 px-4"
+                  />
                   <th className="py-3.5 px-4 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -994,18 +1080,60 @@ export default function CustomerHabitView({
               <thead>
                 <tr className="bg-slate-950 border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400 whitespace-nowrap">
                   <th className="py-3.5 px-4 w-12">No</th>
-                  <th className="py-3.5 px-4 min-w-[210px]">Outlet & Klaster</th>
-                  <th className="py-3.5 px-3 text-right">Pelanggan Unik</th>
-                  <th className="py-3.5 px-3 text-right">Repeat (≥2x)</th>
-                  <th className="py-3.5 px-3 text-center">Repeat Rate</th>
-                  <th className="py-3.5 px-3 text-center">Porsi Trx Repeat</th>
-                  <th className="py-3.5 px-4">Waktu & Kategori Dominan</th>
+                  <SortableTh
+                    label="Outlet & Klaster"
+                    sortKey="outletName"
+                    sortConfig={outletSummarySort}
+                    onSort={(k, d) => setOutletSummarySort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3.5 px-4 min-w-[210px]"
+                  />
+                  <SortableTh
+                    label="Pelanggan Unik"
+                    sortKey="uniqueCustomers"
+                    sortConfig={outletSummarySort}
+                    onSort={(k, d) => setOutletSummarySort((prev) => toggleSortConfig(prev, k, d))}
+                    align="right"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Repeat (≥2x)"
+                    sortKey="repeatCustomers"
+                    sortConfig={outletSummarySort}
+                    onSort={(k, d) => setOutletSummarySort((prev) => toggleSortConfig(prev, k, d))}
+                    align="right"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Repeat Rate"
+                    sortKey="repeatRatePct"
+                    sortConfig={outletSummarySort}
+                    onSort={(k, d) => setOutletSummarySort((prev) => toggleSortConfig(prev, k, d))}
+                    align="center"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Porsi Trx Repeat"
+                    sortKey="repeatTrxSharePct"
+                    sortConfig={outletSummarySort}
+                    onSort={(k, d) => setOutletSummarySort((prev) => toggleSortConfig(prev, k, d))}
+                    align="center"
+                    className="py-3.5 px-3"
+                  />
+                  <SortableTh
+                    label="Waktu & Kategori Dominan"
+                    sortKey="dominantTimeSlot"
+                    sortConfig={outletSummarySort}
+                    onSort={(k, d) => setOutletSummarySort((prev) => toggleSortConfig(prev, k, d))}
+                    defaultDir="asc"
+                    className="py-3.5 px-4"
+                  />
                   <th className="py-3.5 px-4 min-w-[290px]">Top 5 Nomor Paling Sering</th>
                   <th className="py-3.5 px-4 text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/80">
-                {outletSummaries.map((o, idx) => (
+                {sortedOutletSummaries.map((o, idx) => (
                   <tr key={o.outletName} className="hover:bg-slate-800/50 transition-colors">
                     <td className="py-3.5 px-4 font-bold text-slate-400">#{idx + 1}</td>
                     <td className="py-3.5 px-4">
@@ -1331,16 +1459,58 @@ export default function CustomerHabitView({
                         <table className="w-full text-left text-xs tabular-nums">
                           <thead className="sticky top-0 bg-slate-950 border-b border-slate-800 text-[11px] text-slate-400 uppercase">
                             <tr>
-                              <th className="py-2 px-3">Waktu Entri</th>
-                              <th className="py-2 px-3">Outlet / Reseller</th>
-                              <th className="py-2 px-3">Produk</th>
-                              <th className="py-2 px-3">Kategori</th>
-                              <th className="py-2 px-3 text-right">Harga Jual</th>
-                              <th className="py-2 px-3 text-center">Status</th>
+                              <SortableTh
+                                label="Waktu Entri"
+                                sortKey="tglEntri"
+                                sortConfig={detailTxSort}
+                                onSort={(k, d) => setDetailTxSort((prev) => toggleSortConfig(prev, k, d))}
+                                className="py-2 px-3"
+                              />
+                              <SortableTh
+                                label="Outlet / Reseller"
+                                sortKey="reseller"
+                                sortConfig={detailTxSort}
+                                onSort={(k, d) => setDetailTxSort((prev) => toggleSortConfig(prev, k, d))}
+                                defaultDir="asc"
+                                className="py-2 px-3"
+                              />
+                              <SortableTh
+                                label="Produk"
+                                sortKey="produk"
+                                sortConfig={detailTxSort}
+                                onSort={(k, d) => setDetailTxSort((prev) => toggleSortConfig(prev, k, d))}
+                                defaultDir="asc"
+                                className="py-2 px-3"
+                              />
+                              <SortableTh
+                                label="Kategori"
+                                sortKey="subCategory"
+                                sortConfig={detailTxSort}
+                                onSort={(k, d) => setDetailTxSort((prev) => toggleSortConfig(prev, k, d))}
+                                defaultDir="asc"
+                                className="py-2 px-3"
+                              />
+                              <SortableTh
+                                label="Harga Jual"
+                                sortKey="hrgJual"
+                                sortConfig={detailTxSort}
+                                onSort={(k, d) => setDetailTxSort((prev) => toggleSortConfig(prev, k, d))}
+                                align="right"
+                                className="py-2 px-3"
+                              />
+                              <SortableTh
+                                label="Status"
+                                sortKey="status"
+                                sortConfig={detailTxSort}
+                                onSort={(k, d) => setDetailTxSort((prev) => toggleSortConfig(prev, k, d))}
+                                align="center"
+                                defaultDir="asc"
+                                className="py-2 px-3"
+                              />
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-slate-800/70">
-                            {(detailModal.data.transactions || []).map((tx, idx) => (
+                            {sortedDetailTransactions.map((tx, idx) => (
                               <tr key={`${tx.id || idx}`} className="hover:bg-slate-900/70">
                                 <td className="py-2 px-3 font-mono text-[11px] text-slate-300 whitespace-nowrap">
                                   {String(tx.tglEntri || '').replace('T', ' ').slice(0, 19)}
