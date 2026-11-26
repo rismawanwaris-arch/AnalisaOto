@@ -76,6 +76,7 @@ export default function OutletMapView({
   allOutlets = [],
   onInspectOutlet,
   canEdit = true,
+  onOpenCustomerHabits,
 }) {
   const mapContainerRef = useRef(null);
   const mapInstanceRef = useRef(null);
@@ -1399,9 +1400,33 @@ export default function OutletMapView({
                       <span className="text-slate-400">Kategori Favorit:</span>
                       <span className="font-bold text-indigo-300">{habit.topCategoryD1 || '-'}</span>
                     </div>
+
+                    {(habit.topCustomersD1 || []).length > 0 && (
+                      <div className="pt-2 border-t border-slate-800 space-y-1.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                          Top Nomor Sering Transaksi (D1)
+                        </div>
+                        <div className="space-y-1">
+                          {(habit.topCustomersD1 || []).slice(0, 5).map((c) => (
+                            <div
+                              key={c.tujuan}
+                              className="flex items-center justify-between text-[11px] px-2 py-1 rounded-lg bg-slate-900/90 border border-slate-800 tabular-nums"
+                            >
+                              <div className="min-w-0 truncate">
+                                <span className="font-mono font-bold text-white">{c.tujuan}</span>
+                                <span className="text-slate-400 ml-1.5">({c.topProduct})</span>
+                              </div>
+                              <div className="shrink-0 ml-2 font-bold text-indigo-300">
+                                {c.trx}x • {c.peakHour}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <button
                       type="button"
                       onClick={() => onInspectOutlet?.(selectedOutletObj)}
@@ -1410,6 +1435,16 @@ export default function OutletMapView({
                       <Eye className="w-3.5 h-3.5" />
                       <span>Detail 360°</span>
                     </button>
+                    {onOpenCustomerHabits && (
+                      <button
+                        type="button"
+                        onClick={() => onOpenCustomerHabits(selectedOutletObj.outletName)}
+                        className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Habit Pelanggan</span>
+                      </button>
+                    )}
                     {canEdit && (
                       <button
                         type="button"

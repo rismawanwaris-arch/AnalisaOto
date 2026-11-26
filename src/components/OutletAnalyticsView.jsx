@@ -19,6 +19,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   LayoutGrid,
+  Users,
 } from 'lucide-react';
 import {
   formatRupiah,
@@ -36,6 +37,7 @@ export default function OutletAnalyticsView({
   onNavigateToFullOutletView,
   initialSubTab = 'overview_plc_kbb',
   userRole = 'admin',
+  onOpenCustomerHabits,
 }) {
   const kpi = outletAnalytics?.kpi || {};
   const groupComparison = outletAnalytics?.outletGroupComparison || [];
@@ -1000,6 +1002,7 @@ export default function OutletAnalyticsView({
           allOutlets={allOutlets}
           onInspectOutlet={(outlet) => setInspectedOutlet(outlet)}
           canEdit={userRole === 'admin' || userRole === 'analyst'}
+          onOpenCustomerHabits={onOpenCustomerHabits}
         />
       )}
 
@@ -1215,6 +1218,62 @@ export default function OutletAnalyticsView({
                       ))}
                     </div>
                   </div>
+                </div>
+
+                {/* Top Frequent Customer Numbers in this Outlet (D1) */}
+                <div className="bg-slate-950/90 border border-slate-800 rounded-xl p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
+                      <Users className="w-4 h-4 text-cyan-400" />
+                      Nomor Pelanggan Paling Sering di Cabang Ini (D1)
+                    </h4>
+                    {onOpenCustomerHabits && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetName = inspectedOutlet.outletName;
+                          setInspectedOutlet(null);
+                          onOpenCustomerHabits(targetName);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-[11px] font-bold transition-all"
+                      >
+                        <span>Analisa Habit Harian & Mingguan Cabang Ini →</span>
+                      </button>
+                    )}
+                  </div>
+                  {(inspectedOutlet.customerHabit?.topCustomersD1 || []).length === 0 ? (
+                    <div className="text-xs text-slate-400 py-3">
+                      Belum ada data nomor tujuan pada periode D1 di cabang ini.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 tabular-nums">
+                      {(inspectedOutlet.customerHabit?.topCustomersD1 || []).map((c, idx) => (
+                        <div
+                          key={c.tujuan}
+                          className="flex items-center justify-between text-xs py-2 px-3 rounded-lg bg-slate-900/80 border border-slate-800/80"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] font-mono text-slate-500">#{idx + 1}</span>
+                              <span className="font-mono font-extrabold text-white">{c.tujuan}</span>
+                              <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold">
+                                {c.trx}x
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5 truncate">
+                              Produk: <span className="text-emerald-300 font-mono">{c.topProduct}</span> • Jam {c.peakHour}
+                            </div>
+                          </div>
+                          <div className="text-right shrink-0 ml-2">
+                            <div className="font-bold text-white">{formatRupiah(c.omset)}</div>
+                            <div className="text-[10px] text-slate-400">
+                              Avg {formatCompactRupiah(c.avgTicketSize)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

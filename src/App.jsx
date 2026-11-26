@@ -27,6 +27,7 @@ import {
   Lock,
   LogOut,
   Users,
+  UserCheck,
   Sun,
   Moon,
 } from 'lucide-react';
@@ -34,6 +35,7 @@ import ExecutiveKpiCards from './components/ExecutiveKpiCards.jsx';
 import ComparativeCharts from './components/ComparativeCharts.jsx';
 import SideBySideCategoryTable from './components/SideBySideCategoryTable.jsx';
 import OutletAnalyticsView from './components/OutletAnalyticsView.jsx';
+import CustomerHabitView from './components/CustomerHabitView.jsx';
 import GrowthAndFailureSections from './components/GrowthAndFailureSections.jsx';
 import UploadView from './components/UploadView.jsx';
 import RulesSettingsView from './components/RulesSettingsView.jsx';
@@ -72,12 +74,18 @@ export default function App() {
   });
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
-  const [activeMenu, setActiveMenu] = useState('dashboard'); // 'dashboard' | 'kategori_produk' | 'outlets' | 'tren_jam' | 'audit_gagal' | 'explorer' | 'upload' | 'rules'
+  const [activeMenu, setActiveMenu] = useState('dashboard'); // 'dashboard' | 'kategori_produk' | 'outlets' | 'customer_habits' | 'tren_jam' | 'audit_gagal' | 'explorer' | 'upload' | 'rules'
   const [selectedProductCategoryId, setSelectedProductCategoryId] = useState('ALL');
   const [selectedOutletSubTab, setSelectedOutletSubTab] = useState('overview_plc_kbb');
+  const [selectedHabitOutlet, setSelectedHabitOutlet] = useState('ALL');
   const [showFullCombinedDashboard, setShowFullCombinedDashboard] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const handleOpenCustomerHabits = useCallback((outletName = 'ALL') => {
+    setSelectedHabitOutlet(outletName || 'ALL');
+    setActiveMenu('customer_habits');
+  }, []);
 
   // Period Comparison State (PRD Section 5.1)
   const [preset, setPreset] = useState('yesterday_vs_daybefore'); // 'yesterday_vs_daybefore' | 'today_vs_yesterday' | 'this_week_vs_last_week' | 'custom'
@@ -345,9 +353,17 @@ export default function App() {
       badge: `${analytics?.outletAnalytics?.kpi?.officialTrx?.totalOutlets || 45} Cabang`,
     },
     {
+      id: 'customer_habits',
+      section: 'MENU ANALISA HARIAN',
+      label: '4. Habit Pelanggan',
+      shortLabel: 'Habit Pelanggan',
+      icon: UserCheck,
+      badge: 'Per Nomor',
+    },
+    {
       id: 'tren_jam',
       section: 'MENU ANALISA HARIAN',
-      label: '4. Jam Sibuk & Tren Produk',
+      label: '5. Jam Sibuk & Tren Produk',
       shortLabel: 'Jam & Tren',
       icon: TrendingUp,
       badge: analytics?.peakHours?.byTrxD1?.label || '24 Jam',
@@ -355,7 +371,7 @@ export default function App() {
     {
       id: 'audit_gagal',
       section: 'MENU ANALISA HARIAN',
-      label: '5. Audit Transaksi Gagal',
+      label: '6. Audit Transaksi Gagal',
       shortLabel: 'Audit Gagal',
       icon: AlertOctagon,
       badge: `${analytics?.failureAudit?.summary?.totalD1 || 0} Gagal`,
@@ -363,7 +379,7 @@ export default function App() {
     {
       id: 'explorer',
       section: 'DATA & PENGATURAN SISTEM',
-      label: '6. Cari Transaksi Mentah',
+      label: '7. Cari Transaksi Mentah',
       shortLabel: 'Cari Transaksi',
       icon: Table,
       badge: null,
@@ -373,7 +389,7 @@ export default function App() {
           {
             id: 'upload',
             section: 'DATA & PENGATURAN SISTEM',
-            label: '7. Upload Excel & Kalender',
+            label: '8. Upload Excel & Kalender',
             shortLabel: 'Upload Data',
             icon: UploadCloud,
             badge: `${bootstrapData.datesSummary?.length || 0} Hari`,
@@ -381,7 +397,7 @@ export default function App() {
           {
             id: 'rules',
             section: 'DATA & PENGATURAN SISTEM',
-            label: '8. Kamus Kategori & Produk',
+            label: '9. Kamus Kategori & Produk',
             shortLabel: 'Kamus Aturan',
             icon: Settings,
             badge: hasUncategorized ? `${globalUncat.uncategorizedProductCount} Baru!` : `${bootstrapData.rules?.length || 0}`,
@@ -394,7 +410,7 @@ export default function App() {
           {
             id: 'users',
             section: 'DATA & PENGATURAN SISTEM',
-            label: '9. Management User',
+            label: '10. Management User',
             shortLabel: 'Kelola User',
             icon: Users,
             badge: 'Admin',
@@ -904,8 +920,8 @@ export default function App() {
 
         {/* PAGE CONTENT */}
         <main className="flex-1 p-4 sm:p-6 space-y-6 max-w-[1600px] w-full mx-auto">
-          {/* Bar Navigasi Cepat 5 Langkah Analisa Harian */}
-          {['dashboard', 'kategori_produk', 'outlets', 'tren_jam', 'audit_gagal'].includes(
+          {/* Bar Navigasi Cepat 6 Langkah Analisa Harian */}
+          {['dashboard', 'kategori_produk', 'outlets', 'customer_habits', 'tren_jam', 'audit_gagal'].includes(
             activeMenu
           ) && (
             <div className="bg-slate-900/95 border border-slate-800 rounded-2xl p-2.5 shadow-lg flex flex-wrap items-center justify-between gap-2">
@@ -930,14 +946,20 @@ export default function App() {
                     icon: Store,
                   },
                   {
+                    id: 'customer_habits',
+                    label: '4. Habit Pelanggan',
+                    sub: 'Kebiasaan Per Nomor',
+                    icon: UserCheck,
+                  },
+                  {
                     id: 'tren_jam',
-                    label: '4. Jam Sibuk & Tren',
+                    label: '5. Jam Sibuk & Tren',
                     sub: '24 Jam & Top Produk',
                     icon: TrendingUp,
                   },
                   {
                     id: 'audit_gagal',
-                    label: '5. Audit Transaksi Gagal',
+                    label: '6. Audit Transaksi Gagal',
                     sub: `${analytics?.failureAudit?.summary?.totalD1 || 0} Trx Gagal`,
                     icon: AlertOctagon,
                   },
@@ -1321,6 +1343,7 @@ export default function App() {
                     period={analytics?.period || {}}
                     compactMode={true}
                     onNavigateToFullOutletView={() => setActiveMenu('outlets')}
+                    onOpenCustomerHabits={handleOpenCustomerHabits}
                   />
                   <GrowthAndFailureSections
                     growth={analytics?.growth || {}}
@@ -1352,6 +1375,19 @@ export default function App() {
               compactMode={false}
               initialSubTab={selectedOutletSubTab}
               userRole={authState.role}
+              onOpenCustomerHabits={handleOpenCustomerHabits}
+            />
+          )}
+
+          {/* MENU 4: HABIT PELANGGAN PER OUTLET (HARIAN & MINGGUAN) */}
+          {activeMenu === 'customer_habits' && (
+            <CustomerHabitView
+              key="customer-habits-view"
+              datesSummary={bootstrapData.datesSummary || []}
+              defaultDate={customD1}
+              initialOutlet={selectedHabitOutlet}
+              onClearInitialOutlet={() => setSelectedHabitOutlet('ALL')}
+              onToast={showToast}
             />
           )}
 

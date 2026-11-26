@@ -42,6 +42,8 @@ import {
 import {
   parseExcelBuffer,
   computeComparisonAnalytics,
+  computeCustomerHabitAnalytics,
+  computeCustomerHabitDetail,
   scanUncategorizedProducts,
   compileRules,
   evaluateProduct,
@@ -801,6 +803,176 @@ app.get('/api/transactions', (req, res) => {
     });
   } catch (err) {
     return safeServerError(res, err);
+  }
+});
+
+/**
+ * Resolves target YYYY-MM-DD dates and label for Customer Habit analytics.
+ */
+function resolveHabitDates(periodMode, date, startDate, endDate, availableDates) {
+  const sortedAsc = [...availableDates].sort((a, b) => a.localeCompare(b));
+  if (sortedAsc.length === 0) {
+    return { targetDates: [], periodLabel: 'Belum Ada Data' };
+  }
+  const latestDate = sortedAsc[sortedAsc.length - 1];
+  const oldestDate = sortedAsc[0];
+
+  if (periodMode === 'daily') {
+    const picked = date && sortedAsc.includes(String(date)) ? String(date) : latestDate;
+    return {
+      targetDates: [picked],
+      periodLabel: formatIndonesianDate(picked),
+    };
+  }
+
+  if (periodMode === 'custom') {
+    let s = startDate ? String(startDate) : oldestDate;
+    let e = endDate ? String(endDate) : latestDate;
+    if (s > e) {
+      [s, e] = [e, s];
+    }
+    const targetDates = sortedAsc.filter((d) => d >= s && d <= e);
+    const label =
+      targetDates.length <= 1
+        ? formatIndonesianDate(targetDates[0] || s)
+        : `${formatIndonesianDate(targetDates[0])} - ${formatIndonesianDate(targetDates[targetDates.length - 1])} (${targetDates.length} Hari)`;
+    return { targetDates, periodLabel: label };
+  }
+
+  if (periodMode === 'all') {
+    const label =
+      sortedAsc.length === 1
+        ? formatIndonesianDate(sortedAsc[0])
+        : `Semua Data (${formatIndonesianDate(oldestDate)} - ${formatIndonesianDate(latestDate)}, ${sortedAsc.length} Hari)`;
+    return { targetDates: sortedAsc, periodLabel: label };
+  }
+
+  // Default: 'weekly' (last 7 calendar days anchored at endDate or latestDate)
+  const anchorEnd = endDate && /^\d{4}-\d{2}-\d{2}$/.test(String(endDate)) ? String(endDate) : latestDate;
+  const [ey, em, ed] = anchorEnd.split('-').map(Number);
+  const startUtc = new Date(Date.UTC(ey, em - 1, ed - 6));
+  const anchorStart = `${startUtc.getUTCFullYear()}-${String(startUtc.getUTCMonth() + 1).padStart(2, '0')}-${String(startUtc.getUTCDate()).padStart(2, '0')}`;
+  const targetDates = sortedAsc.filter((d) => d >= anchorStart && d <= anchorEnd);
+  const effectiveDates = targetDates.length > 0 ? targetDates : [latestDate];
+  const label =
+    effectiveDates.length === 1
+      ? `${formatIndonesianDate(effectiveDates[0])} (1 Hari Data)`
+      : `${formatIndonesianDate(effectiveDates[0])} - ${formatIndonesianDate(effectiveDates[effectiveDates.length - 1])} (${effectiveDates.length} Hari Data)`;
+  return { targetDates: effectiveDates, periodLabel: label };
+}
+
+function validateOptionalIsoDate(val) {
+  if (val === undefined || val === null || val === '') return true;
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(val));
+}
+
+// 11.5 Customer Habit Analytics per Outlet & per Target Number (Harian / Mingguan)
+app.get('/api/customer-habits', (req, res) => {
+  try {
+    const {
+      periodMode = 'weekly',
+      date,
+      startDate,
+      endDate,
+      group = 'ALL',
+      outlet = 'ALL',
+      segment = 'ALL',
+      minTrx = '2',
+      search = '',
+      sortBy = 'trx_desc',
+      page = '1',
+      limit = '50',
+    } = req.query;
+
+    if (!validateOptionalIsoDate(date) || !validateOptionalIsoDate(startDate) || !validateOptionalIsoDate(endDate)) {
+      return res.status(400).json({ error: 'Format tanggal tidak valid (wajib YYYY-MM-DD).' });
+    }
+
+    const datesSummary = listAvailableDatesSummary();
+    const availableDates = datesSummary.map((d) => d.date);
+    const { targetDates, periodLabel } = resolveHabitDates(
+      String(periodMode),
+      date,
+      startDate,
+      endDate,
+      availableDates
+    );
+
+    const transactions = targetDates.length > 0 ? getAllTransactionsAcrossDates(targetDates) : [];
+    const categories = getCategories();
+    const rules = getRules();
+
+    const habitData = computeCustomerHabitAnalytics({
+      transactions,
+      dates: targetDates,
+      periodLabel,
+      periodMode: String(periodMode),
+      categories,
+      rules,
+      groupFilter: String(group || 'ALL'),
+      outletFilter: String(outlet || 'ALL'),
+      segmentFilter: String(segment || 'ALL'),
+      minTrx,
+      search: String(search || ''),
+      sortBy: String(sortBy || 'trx_desc'),
+      page,
+      limit,
+    });
+
+    res.json({
+      ...habitData,
+      availableDates: datesSummary,
+    });
+  } catch (err) {
+    return safeServerError(res, err, 'Gagal memproses analisa kebiasaan pelanggan.');
+  }
+});
+
+// 11.6 Single Customer Number 360° Habit Detail
+app.get('/api/customer-habits/detail', (req, res) => {
+  try {
+    const {
+      tujuan,
+      periodMode = 'weekly',
+      date,
+      startDate,
+      endDate,
+    } = req.query;
+
+    const cleanTujuan = String(tujuan || '').trim();
+    if (!cleanTujuan) {
+      return res.status(400).json({ error: 'Parameter nomor tujuan wajib diisi.' });
+    }
+    if (!validateOptionalIsoDate(date) || !validateOptionalIsoDate(startDate) || !validateOptionalIsoDate(endDate)) {
+      return res.status(400).json({ error: 'Format tanggal tidak valid (wajib YYYY-MM-DD).' });
+    }
+
+    const datesSummary = listAvailableDatesSummary();
+    const availableDates = datesSummary.map((d) => d.date);
+    const { targetDates, periodLabel } = resolveHabitDates(
+      String(periodMode),
+      date,
+      startDate,
+      endDate,
+      availableDates
+    );
+
+    const transactions = targetDates.length > 0 ? getAllTransactionsAcrossDates(targetDates) : [];
+    const categories = getCategories();
+    const rules = getRules();
+
+    const detail = computeCustomerHabitDetail({
+      transactions,
+      dates: targetDates,
+      periodLabel,
+      tujuan: cleanTujuan,
+      categories,
+      rules,
+    });
+
+    res.json(detail);
+  } catch (err) {
+    return safeServerError(res, err, 'Gagal memuat detail kebiasaan pelanggan.');
   }
 });
 

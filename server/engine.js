@@ -845,6 +845,7 @@ export function computeComparisonAnalytics({
             byCategory: new Map(),
             byProduct: new Map(),
             customerCounts: new Map(),
+            customerDetails: new Map(),
             hourly: Array.from({ length: 24 }, (_, hr) => ({
               hour: hr,
               label: `${String(hr).padStart(2, '0')}:00`,
@@ -876,6 +877,20 @@ export function computeComparisonAnalytics({
         const custKey = String(tx.tujuan || '').trim();
         if (custKey && custKey !== '-' && custKey !== '<null>') {
           rEntry.customerCounts.set(custKey, (rEntry.customerCounts.get(custKey) || 0) + 1);
+          if (!rEntry.customerDetails.has(custKey)) {
+            rEntry.customerDetails.set(custKey, {
+              tujuan: custKey,
+              trx: 0,
+              omset: 0,
+              products: new Map(),
+              hours: new Map(),
+            });
+          }
+          const cDet = rEntry.customerDetails.get(custKey);
+          cDet.trx++;
+          cDet.omset += tx.hrgJual;
+          cDet.products.set(tx.produk, (cDet.products.get(tx.produk) || 0) + 1);
+          cDet.hours.set(h, (cDet.hours.get(h) || 0) + 1);
         }
 
         // Per-outlet category breakdown
@@ -947,6 +962,7 @@ export function computeComparisonAnalytics({
             byCategory: new Map(),
             byProduct: new Map(),
             customerCounts: new Map(),
+            customerDetails: new Map(),
             hourly: Array.from({ length: 24 }, (_, hr) => ({
               hour: hr,
               label: `${String(hr).padStart(2, '0')}:00`,
@@ -1398,6 +1414,40 @@ export function computeComparisonAnalytics({
       : 0;
     const avgTicketSizeD1 = trxD1 > 0 ? Math.round(omsetD1 / trxD1) : 0;
 
+    // Top frequent customers at this outlet on D1
+    const topCustomersD1 = [];
+    if (r1?.customerDetails && r1.customerDetails.size > 0) {
+      const sortedCusts = Array.from(r1.customerDetails.values())
+        .sort((a, b) => b.trx - a.trx || b.omset - a.omset)
+        .slice(0, 8);
+      for (const cd of sortedCusts) {
+        let topProduct = '-';
+        let topProdCnt = 0;
+        for (const [pName, pCnt] of cd.products.entries()) {
+          if (pCnt > topProdCnt) {
+            topProdCnt = pCnt;
+            topProduct = pName;
+          }
+        }
+        let peakHr = 0;
+        let peakHrCnt = -1;
+        for (const [hr, hrCnt] of cd.hours.entries()) {
+          if (hrCnt > peakHrCnt) {
+            peakHrCnt = hrCnt;
+            peakHr = hr;
+          }
+        }
+        topCustomersD1.push({
+          tujuan: cd.tujuan,
+          trx: cd.trx,
+          omset: cd.omset,
+          avgTicketSize: cd.trx > 0 ? Math.round(cd.omset / cd.trx) : 0,
+          topProduct,
+          peakHour: `${String(peakHr).padStart(2, '0')}:00`,
+        });
+      }
+    }
+
     // Dominant time-of-day habit slot
     const slots = [
       { label: 'Dini Hari (00-05)', from: 0, to: 5 },
@@ -1454,6 +1504,7 @@ export function computeComparisonAnalytics({
         avgTicketSizeD1,
         dominantTimeSlotD1,
         topCategoryD1: outletCatBreakdown[0]?.trxD1 > 0 ? outletCatBreakdown[0].name : '-',
+        topCustomersD1,
       },
       categoryBreakdown: outletCatBreakdown,
       topProducts: outletTopProducts.slice(0, 12),
@@ -1793,4 +1844,871 @@ function generateWhatsAppSummary({
   );
 
   return lines.join('\n');
+}
+
+const INDO_DAY_NAMES = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+
+const HABIT_TIME_SLOTS = [
+  { label: 'Dini Hari (00-05)', from: 0, to: 5 },
+  { label: 'Pagi (06-11)', from: 6, to: 11 },
+  { label: 'Siang (12-16)', from: 12, to: 16 },
+  { label: 'Sore & Malam (17-23)', from: 17, to: 23 },
+];
+
+const HABIT_SEGMENT_LABELS = {
+  vip_power: 'Pelanggan VIP / Power',
+  rutin_harian: 'Rutin Lintas Hari',
+  rutin_mingguan: 'Rutin Mingguan',
+  repeat_harian: 'Repeat Harian',
+  reguler: 'Pelanggan Reguler',
+};
+
+/**
+ * Safely computes day-of-week index (0=Minggu..6=Sabtu) from YYYY-MM-DD without UTC offset drift.
+ */
+function getDayOfWeekFromDateStr(dateStr) {
+  const parts = String(dateStr || '').split('-');
+  if (parts.length !== 3) return 0;
+  const y = Number(parts[0]);
+  const m = Number(parts[1]);
+  const d = Number(parts[2]);
+  if (!y || !m || !d) return 0;
+  return new Date(y, m - 1, d).getDay();
+}
+
+/**
+ * Infers human-readable customer target number type based on dominant category.
+ */
+function inferCustomerType(topCategoryId) {
+  if (topCategoryId === 'cat_transfer_bank') return 'Rekening Bank';
+  if (topCategoryId === 'cat_ewallet') return 'Nomor E-Wallet';
+  if (topCategoryId === 'cat_ppob') return 'ID Pelanggan / PPOB';
+  if (topCategoryId === 'cat_pulsa_data' || topCategoryId === 'cat_voucher') {
+    return 'Nomor HP / Seluler';
+  }
+  return 'Nomor Tujuan';
+}
+
+/**
+ * Classifies a customer's repeat frequency into an actionable habit segment.
+ */
+function classifyHabitSegment({ totalTrx, activeDays, totalDaysInPeriod, maxTrxInOneDay, totalOmset }) {
+  if (
+    totalTrx >= 5 ||
+    (totalDaysInPeriod >= 3 && activeDays >= 3 && totalTrx >= 4) ||
+    (totalOmset >= 10_000_000 && totalTrx >= 2)
+  ) {
+    return 'vip_power';
+  }
+  if (totalDaysInPeriod >= 2 && activeDays >= Math.max(2, Math.ceil(totalDaysInPeriod * 0.6))) {
+    return 'rutin_harian';
+  }
+  if (totalDaysInPeriod >= 3 && activeDays >= 2) {
+    return 'rutin_mingguan';
+  }
+  if (maxTrxInOneDay >= 2) {
+    return 'repeat_harian';
+  }
+  return 'reguler';
+}
+
+/**
+ * Finds the dominant time-of-day slot from a 24-hour count array.
+ */
+function resolveDominantTimeSlot(hourlyCounts) {
+  let dominant = '-';
+  let bestSum = 0;
+  for (const slot of HABIT_TIME_SLOTS) {
+    let sum = 0;
+    for (let hr = slot.from; hr <= slot.to; hr++) {
+      sum += hourlyCounts[hr] || 0;
+    }
+    if (sum > bestSum) {
+      bestSum = sum;
+      dominant = slot.label;
+    }
+  }
+  return dominant;
+}
+
+/**
+ * Checks whether an evaluated outlet matches the requested groupFilter and outletFilter.
+ */
+function matchesOutletScope(outletEval, groupFilter, outletFilter) {
+  if (outletFilter && outletFilter !== 'ALL') {
+    if (outletEval.outletName.toLowerCase() !== String(outletFilter).trim().toLowerCase()) {
+      return false;
+    }
+  }
+  if (groupFilter && groupFilter !== 'ALL') {
+    if (groupFilter === 'OFFICIAL') {
+      if (!outletEval.isOfficialOutlet) return false;
+    } else if (outletEval.groupId !== groupFilter) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Finalizes a customer accumulator into a structured habit profile object.
+ */
+function finalizeCustomerHabitRecord(acc, { totalDaysInPeriod, globalOutletMap }) {
+  const activeDates = Array.from(acc.dateCounts.keys()).sort();
+  const activeDays = activeDates.length;
+  let maxTrxInOneDay = 0;
+  for (const cnt of acc.dateCounts.values()) {
+    if (cnt > maxTrxInOneDay) maxTrxInOneDay = cnt;
+  }
+
+  let peakHourIdx = 0;
+  let peakHourTrx = -1;
+  const activeHours = [];
+  for (let hr = 0; hr < 24; hr++) {
+    const cnt = acc.hourlyCounts[hr] || 0;
+    if (cnt > 0) activeHours.push(hr);
+    if (cnt > peakHourTrx) {
+      peakHourTrx = cnt;
+      peakHourIdx = hr;
+    }
+  }
+  const peakHour = acc.totalTrx > 0 ? `${String(peakHourIdx).padStart(2, '0')}:00` : '-';
+  const dominantTimeSlot = resolveDominantTimeSlot(acc.hourlyCounts);
+
+  let favDowIdx = 0;
+  let favDowCnt = -1;
+  for (let d = 0; d < 7; d++) {
+    if (acc.dowCounts[d] > favDowCnt) {
+      favDowCnt = acc.dowCounts[d];
+      favDowIdx = d;
+    }
+  }
+  const favoriteDayOfWeek = acc.totalTrx > 0 ? INDO_DAY_NAMES[favDowIdx] : '-';
+
+  const outletsList = Array.from(acc.outlets.values())
+    .sort((a, b) => b.trx - a.trx || b.omset - a.omset)
+    .map((o) => ({
+      ...o,
+      sharePct: acc.totalTrx > 0 ? Number(((o.trx / acc.totalTrx) * 100).toFixed(1)) : 0,
+    }));
+  const primaryOutletObj = outletsList[0] || {
+    outletName: '-',
+    outletCode: '-',
+    groupId: 'non_plc_kbb',
+    groupShortName: '-',
+    subCluster: '-',
+    trx: 0,
+  };
+
+  const globalOutletsForNum = globalOutletMap?.get(acc.tujuan);
+  const globalOutletCount = globalOutletsForNum ? globalOutletsForNum.size : outletsList.length;
+
+  const categoriesList = Array.from(acc.categories.values()).sort(
+    (a, b) => b.trx - a.trx || b.omset - a.omset
+  );
+  const topCatObj = categoriesList[0] || { categoryId: '', name: '-', shortName: '-' };
+
+  const productsList = Array.from(acc.products.values()).sort(
+    (a, b) => b.trx - a.trx || b.omset - a.omset
+  );
+  const topProdObj = productsList[0] || { produk: '-', subCategory: '-' };
+
+  const avgTicketSize = acc.totalTrx > 0 ? Math.round(acc.totalOmset / acc.totalTrx) : 0;
+  const avgTrxPerActiveDay = activeDays > 0 ? Number((acc.totalTrx / activeDays).toFixed(2)) : 0;
+  const avgTrxPerPeriodDay =
+    totalDaysInPeriod > 0 ? Number((acc.totalTrx / totalDaysInPeriod).toFixed(2)) : 0;
+  const estimatedPerWeek =
+    totalDaysInPeriod >= 7
+      ? Number(((acc.totalTrx / totalDaysInPeriod) * 7).toFixed(1))
+      : totalDaysInPeriod >= 2
+      ? Number(((acc.totalTrx / totalDaysInPeriod) * 7).toFixed(1))
+      : acc.totalTrx;
+
+  const habitSegment = classifyHabitSegment({
+    totalTrx: acc.totalTrx,
+    activeDays,
+    totalDaysInPeriod,
+    maxTrxInOneDay,
+    totalOmset: acc.totalOmset,
+  });
+  const habitLabel = HABIT_SEGMENT_LABELS[habitSegment] || 'Pelanggan Reguler';
+  const customerType = inferCustomerType(topCatObj.categoryId);
+
+  const loyaltyPct = primaryOutletObj.sharePct || 0;
+  const outletCount = outletsList.length;
+  const isMultiOutlet = globalOutletCount > 1 || outletCount > 1;
+
+  const freqText =
+    activeDays > 1
+      ? `${acc.totalTrx}x dalam ${activeDays} hari`
+      : `${acc.totalTrx}x transaksi`;
+  const outletText =
+    outletCount > 1
+      ? `utama di ${primaryOutletObj.outletName} (${loyaltyPct}%, total ${outletCount} outlet)`
+      : `setia di ${primaryOutletObj.outletName}`;
+  const habitSummaryText = `Bertransaksi ${freqText}, ${outletText}, dominan ${dominantTimeSlot} (puncak ${peakHour}) dengan produk favorit ${topProdObj.produk}.`;
+
+  return {
+    tujuan: acc.tujuan,
+    customerType,
+    totalTrx: acc.totalTrx,
+    gagalTrx: acc.gagalTrx,
+    totalOmset: acc.totalOmset,
+    totalLaba: acc.totalLaba,
+    totalKomisi: acc.totalKomisi,
+    avgTicketSize,
+    activeDays,
+    activeDates,
+    maxTrxInOneDay,
+    avgTrxPerActiveDay,
+    avgTrxPerPeriodDay,
+    estimatedPerWeek,
+    peakHour,
+    peakHourTrx: Math.max(0, peakHourTrx),
+    dominantTimeSlot,
+    activeHours,
+    favoriteDayOfWeek,
+    dowCounts: acc.dowCounts,
+    primaryOutlet: primaryOutletObj.outletName,
+    primaryOutletCode: primaryOutletObj.outletCode,
+    primaryOutletGroup: primaryOutletObj.groupShortName,
+    primaryOutletSubCluster: primaryOutletObj.subCluster,
+    loyaltyPct,
+    outletCount,
+    isMultiOutlet,
+    globalOutletCount,
+    outlets: outletsList.slice(0, 5),
+    topCategory: topCatObj.name,
+    topCategories: categoriesList.slice(0, 3),
+    topProduct: topProdObj.produk,
+    topProducts: productsList.slice(0, 5),
+    habitSegment,
+    habitLabel,
+    habitSummaryText,
+  };
+}
+
+/**
+ * Computes full Customer Habit Analytics per outlet & per target number across selected dates.
+ */
+export function computeCustomerHabitAnalytics({
+  transactions = [],
+  dates = [],
+  periodLabel = '-',
+  periodMode = 'weekly',
+  categories = [],
+  rules = [],
+  groupFilter = 'ALL',
+  outletFilter = 'ALL',
+  segmentFilter = 'ALL',
+  minTrx = 2,
+  search = '',
+  sortBy = 'trx_desc',
+  page = 1,
+  limit = 50,
+}) {
+  const categoriesMap = new Map(categories.map((c) => [c.id, c]));
+  const compiledRules = compileRules(rules);
+  const totalDaysInPeriod = Math.max(1, dates.length || new Set(transactions.map((t) => t.date).filter(Boolean)).size || 1);
+
+  // Pass 1: Global multi-outlet detection & available outlet inventory
+  const globalOutletMap = new Map(); // tujuan -> Map<outletName, count>
+  const availableOutletsMap = new Map(); // outletName -> metadata + per-outlet customer accumulator
+  const outletCache = new Map(); // "reseller||pengirim" -> evaluated outlet
+
+  const getEvalOutlet = (tx) => {
+    const key = `${tx.reseller || ''}||${tx.pengirim || ''}`;
+    let ev = outletCache.get(key);
+    if (!ev) {
+      ev = evaluateOutlet(tx.reseller, tx.pengirim);
+      outletCache.set(key, ev);
+    }
+    return ev;
+  };
+
+  for (const tx of transactions) {
+    const tujuan = String(tx.tujuan || '').trim();
+    if (!tujuan || tujuan === '-' || tujuan.toLowerCase() === '<null>') continue;
+    const isSukses = tx.status === 'Sukses';
+    if (!isSukses) continue;
+
+    const outletEval = getEvalOutlet(tx);
+    if (!globalOutletMap.has(tujuan)) {
+      globalOutletMap.set(tujuan, new Map());
+    }
+    const gm = globalOutletMap.get(tujuan);
+    gm.set(outletEval.outletName, (gm.get(outletEval.outletName) || 0) + 1);
+
+    if (!availableOutletsMap.has(outletEval.outletName)) {
+      availableOutletsMap.set(outletEval.outletName, {
+        outletName: outletEval.outletName,
+        outletCode: outletEval.outletCode,
+        groupId: outletEval.groupId,
+        groupShortName: outletEval.groupShortName,
+        subCluster: outletEval.subCluster,
+        isOfficialOutlet: outletEval.isOfficialOutlet,
+        totalTrx: 0,
+        totalOmset: 0,
+        hourlyCounts: Array(24).fill(0),
+        categories: new Map(),
+        customers: new Map(), // tujuan -> { tujuan, trx, omset, dates: Set, products: Map, hours: Array(24) }
+      });
+    }
+    const oAcc = availableOutletsMap.get(outletEval.outletName);
+    if (oAcc.outletCode === '-' && outletEval.outletCode !== '-') {
+      oAcc.outletCode = outletEval.outletCode;
+    }
+    oAcc.totalTrx++;
+    oAcc.totalOmset += tx.hrgJual || 0;
+    const hr = Math.max(0, Math.min(23, Number(tx.hour) || 0));
+    oAcc.hourlyCounts[hr]++;
+
+    const prodEval = evaluateProduct(tx.produk, tx.modul, compiledRules, categoriesMap);
+    const catKey = prodEval.categoryId;
+    if (!oAcc.categories.has(catKey)) {
+      oAcc.categories.set(catKey, { name: prodEval.categoryName, trx: 0 });
+    }
+    oAcc.categories.get(catKey).trx++;
+
+    if (!oAcc.customers.has(tujuan)) {
+      oAcc.customers.set(tujuan, {
+        tujuan,
+        trx: 0,
+        omset: 0,
+        dates: new Set(),
+        products: new Map(),
+        hours: Array(24).fill(0),
+      });
+    }
+    const oc = oAcc.customers.get(tujuan);
+    oc.trx++;
+    oc.omset += tx.hrgJual || 0;
+    if (tx.date) oc.dates.add(tx.date);
+    oc.products.set(tx.produk, (oc.products.get(tx.produk) || 0) + 1);
+    oc.hours[hr]++;
+  }
+
+  // Pass 2: Aggregate customers in the selected groupFilter & outletFilter scope
+  const customerAccMap = new Map();
+  let scopeSuksesTrx = 0;
+  let scopeOmset = 0;
+
+  for (const tx of transactions) {
+    const tujuan = String(tx.tujuan || '').trim();
+    if (!tujuan || tujuan === '-' || tujuan.toLowerCase() === '<null>') continue;
+
+    const outletEval = getEvalOutlet(tx);
+    if (!matchesOutletScope(outletEval, groupFilter, outletFilter)) continue;
+
+    if (!customerAccMap.has(tujuan)) {
+      customerAccMap.set(tujuan, {
+        tujuan,
+        totalTrx: 0,
+        gagalTrx: 0,
+        totalOmset: 0,
+        totalLaba: 0,
+        totalKomisi: 0,
+        dateCounts: new Map(),
+        hourlyCounts: Array(24).fill(0),
+        dowCounts: Array(7).fill(0),
+        outlets: new Map(),
+        categories: new Map(),
+        products: new Map(),
+      });
+    }
+    const acc = customerAccMap.get(tujuan);
+
+    if (tx.status !== 'Sukses') {
+      acc.gagalTrx++;
+      continue;
+    }
+
+    scopeSuksesTrx++;
+    scopeOmset += tx.hrgJual || 0;
+
+    acc.totalTrx++;
+    acc.totalOmset += tx.hrgJual || 0;
+    acc.totalLaba += tx.laba || 0;
+    acc.totalKomisi += tx.komisi || 0;
+
+    if (tx.date) {
+      acc.dateCounts.set(tx.date, (acc.dateCounts.get(tx.date) || 0) + 1);
+      const dow = getDayOfWeekFromDateStr(tx.date);
+      acc.dowCounts[dow]++;
+    }
+
+    const hr = Math.max(0, Math.min(23, Number(tx.hour) || 0));
+    acc.hourlyCounts[hr]++;
+
+    if (!acc.outlets.has(outletEval.outletName)) {
+      acc.outlets.set(outletEval.outletName, {
+        outletName: outletEval.outletName,
+        outletCode: outletEval.outletCode,
+        groupId: outletEval.groupId,
+        groupShortName: outletEval.groupShortName,
+        subCluster: outletEval.subCluster,
+        trx: 0,
+        omset: 0,
+      });
+    }
+    const cOut = acc.outlets.get(outletEval.outletName);
+    cOut.trx++;
+    cOut.omset += tx.hrgJual || 0;
+
+    const prodEval = evaluateProduct(tx.produk, tx.modul, compiledRules, categoriesMap);
+    const catMeta = categoriesMap.get(prodEval.categoryId);
+    if (!acc.categories.has(prodEval.categoryId)) {
+      acc.categories.set(prodEval.categoryId, {
+        categoryId: prodEval.categoryId,
+        name: prodEval.categoryName,
+        shortName: catMeta?.shortName || prodEval.categoryName,
+        color: catMeta?.color || '#6366f1',
+        trx: 0,
+        omset: 0,
+      });
+    }
+    const cCat = acc.categories.get(prodEval.categoryId);
+    cCat.trx++;
+    cCat.omset += tx.hrgJual || 0;
+
+    if (!acc.products.has(tx.produk)) {
+      acc.products.set(tx.produk, {
+        produk: tx.produk,
+        subCategory: prodEval.subCategory,
+        trx: 0,
+        omset: 0,
+      });
+    }
+    const cProd = acc.products.get(tx.produk);
+    cProd.trx++;
+    cProd.omset += tx.hrgJual || 0;
+  }
+
+  // Finalize all customer records in scope (excluding pure failed-only records with 0 sukses)
+  const allCustomers = [];
+  const segmentBreakdown = {
+    vip_power: 0,
+    rutin_harian: 0,
+    rutin_mingguan: 0,
+    repeat_harian: 0,
+    reguler: 0,
+  };
+  let repeatCustomersCount = 0;
+  let repeatTrxCount = 0;
+  let repeatOmset = 0;
+  let multiOutletCustomersCount = 0;
+
+  for (const acc of customerAccMap.values()) {
+    if (acc.totalTrx <= 0) continue;
+    const item = finalizeCustomerHabitRecord(acc, { totalDaysInPeriod, globalOutletMap });
+    allCustomers.push(item);
+    segmentBreakdown[item.habitSegment] = (segmentBreakdown[item.habitSegment] || 0) + 1;
+    if (item.totalTrx >= 2) {
+      repeatCustomersCount++;
+      repeatTrxCount += item.totalTrx;
+      repeatOmset += item.totalOmset;
+    }
+    if (item.isMultiOutlet) {
+      multiOutletCustomersCount++;
+    }
+  }
+
+  allCustomers.sort((a, b) => b.totalTrx - a.totalTrx || b.totalOmset - a.totalOmset);
+
+  const totalUniqueCustomers = allCustomers.length;
+  const repeatRatePct =
+    totalUniqueCustomers > 0
+      ? Number(((repeatCustomersCount / totalUniqueCustomers) * 100).toFixed(1))
+      : 0;
+  const repeatTrxSharePct =
+    scopeSuksesTrx > 0 ? Number(((repeatTrxCount / scopeSuksesTrx) * 100).toFixed(1)) : 0;
+  const repeatOmsetSharePct =
+    scopeOmset > 0 ? Number(((repeatOmset / scopeOmset) * 100).toFixed(1)) : 0;
+  const avgTrxPerCustomer =
+    totalUniqueCustomers > 0
+      ? Number((scopeSuksesTrx / totalUniqueCustomers).toFixed(2))
+      : 0;
+
+  // Build per-outlet summaries (respecting groupFilter)
+  const outletSummaries = [];
+  const availableOutlets = [];
+
+  for (const oAcc of availableOutletsMap.values()) {
+    availableOutlets.push({
+      outletName: oAcc.outletName,
+      outletCode: oAcc.outletCode,
+      groupId: oAcc.groupId,
+      groupShortName: oAcc.groupShortName,
+      subCluster: oAcc.subCluster,
+      isOfficialOutlet: oAcc.isOfficialOutlet,
+      totalTrx: oAcc.totalTrx,
+      totalOmset: oAcc.totalOmset,
+    });
+
+    if (!matchesOutletScope(oAcc, groupFilter, 'ALL')) continue;
+
+    let uniqueCustomers = 0;
+    let repeatCustomers = 0;
+    let outletRepeatTrx = 0;
+    const custArr = [];
+
+    for (const oc of oAcc.customers.values()) {
+      uniqueCustomers++;
+      if (oc.trx >= 2) {
+        repeatCustomers++;
+        outletRepeatTrx += oc.trx;
+      }
+      let topProduct = '-';
+      let topProdCnt = 0;
+      for (const [pName, pCnt] of oc.products.entries()) {
+        if (pCnt > topProdCnt) {
+          topProdCnt = pCnt;
+          topProduct = pName;
+        }
+      }
+      let peakHr = 0;
+      let peakHrCnt = -1;
+      for (let hr = 0; hr < 24; hr++) {
+        if (oc.hours[hr] > peakHrCnt) {
+          peakHrCnt = oc.hours[hr];
+          peakHr = hr;
+        }
+      }
+      const activeDays = oc.dates.size || 1;
+      custArr.push({
+        tujuan: oc.tujuan,
+        trx: oc.trx,
+        activeDays,
+        omset: oc.omset,
+        topProduct,
+        peakHour: `${String(peakHr).padStart(2, '0')}:00`,
+        habitSegment: classifyHabitSegment({
+          totalTrx: oc.trx,
+          activeDays,
+          totalDaysInPeriod,
+          maxTrxInOneDay: oc.trx,
+          totalOmset: oc.omset,
+        }),
+      });
+    }
+
+    custArr.sort((a, b) => b.trx - a.trx || b.omset - a.omset);
+
+    let topCategory = '-';
+    let topCatTrx = 0;
+    for (const cat of oAcc.categories.values()) {
+      if (cat.trx > topCatTrx) {
+        topCatTrx = cat.trx;
+        topCategory = cat.name;
+      }
+    }
+
+    outletSummaries.push({
+      outletName: oAcc.outletName,
+      outletCode: oAcc.outletCode,
+      groupId: oAcc.groupId,
+      groupShortName: oAcc.groupShortName,
+      subCluster: oAcc.subCluster,
+      isOfficialOutlet: oAcc.isOfficialOutlet,
+      totalTrx: oAcc.totalTrx,
+      totalOmset: oAcc.totalOmset,
+      uniqueCustomers,
+      repeatCustomers,
+      repeatTrxCount: outletRepeatTrx,
+      repeatRatePct:
+        uniqueCustomers > 0 ? Number(((repeatCustomers / uniqueCustomers) * 100).toFixed(1)) : 0,
+      repeatTrxSharePct:
+        oAcc.totalTrx > 0 ? Number(((outletRepeatTrx / oAcc.totalTrx) * 100).toFixed(1)) : 0,
+      avgTrxPerCustomer:
+        uniqueCustomers > 0 ? Number((oAcc.totalTrx / uniqueCustomers).toFixed(2)) : 0,
+      dominantTimeSlot: resolveDominantTimeSlot(oAcc.hourlyCounts),
+      topCategory,
+      topFrequentNumbers: custArr.slice(0, 5),
+    });
+  }
+
+  outletSummaries.sort(
+    (a, b) =>
+      b.repeatCustomers - a.repeatCustomers ||
+      b.repeatRatePct - a.repeatRatePct ||
+      b.totalTrx - a.totalTrx
+  );
+  availableOutlets.sort((a, b) => b.totalOmset - a.totalOmset || b.totalTrx - a.totalTrx);
+
+  // Filter & Sort Customers for Table
+  const minTrxNum = Math.max(1, parseInt(minTrx, 10) || 1);
+  const q = String(search || '').trim().toLowerCase();
+
+  const filteredCustomers = allCustomers.filter((c) => {
+    if (c.totalTrx < minTrxNum) return false;
+    if (segmentFilter && segmentFilter !== 'ALL') {
+      if (segmentFilter === 'multi_outlet') {
+        if (!c.isMultiOutlet) return false;
+      } else if (c.habitSegment !== segmentFilter) {
+        return false;
+      }
+    }
+    if (q) {
+      const hay = `${c.tujuan} ${c.primaryOutlet} ${c.topProduct} ${c.topCategory} ${c.customerType} ${c.habitLabel}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  if (sortBy === 'omset_desc') {
+    filteredCustomers.sort((a, b) => b.totalOmset - a.totalOmset || b.totalTrx - a.totalTrx);
+  } else if (sortBy === 'active_days_desc') {
+    filteredCustomers.sort((a, b) => b.activeDays - a.activeDays || b.totalTrx - a.totalTrx || b.totalOmset - a.totalOmset);
+  } else if (sortBy === 'avg_per_day_desc') {
+    filteredCustomers.sort((a, b) => b.maxTrxInOneDay - a.maxTrxInOneDay || b.totalTrx - a.totalTrx);
+  } else if (sortBy === 'multi_outlet_desc') {
+    filteredCustomers.sort((a, b) => b.globalOutletCount - a.globalOutletCount || b.totalTrx - a.totalTrx);
+  } else {
+    filteredCustomers.sort((a, b) => b.totalTrx - a.totalTrx || b.totalOmset - a.totalOmset);
+  }
+
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(10, Math.min(200, parseInt(limit, 10) || 50));
+  const totalFiltered = filteredCustomers.length;
+  const totalPages = Math.max(1, Math.ceil(totalFiltered / limitNum));
+  const safePage = Math.min(pageNum, totalPages);
+  const startIdx = (safePage - 1) * limitNum;
+  const pagedCustomers = filteredCustomers.slice(startIdx, startIdx + limitNum);
+
+  return {
+    summary: {
+      totalDaysInPeriod,
+      dates,
+      periodLabel,
+      periodMode,
+      totalSuksesTrx: scopeSuksesTrx,
+      totalOmset: scopeOmset,
+      totalUniqueCustomers,
+      repeatCustomersCount,
+      repeatRatePct,
+      repeatTrxCount,
+      repeatTrxSharePct,
+      repeatOmset,
+      repeatOmsetSharePct,
+      multiOutletCustomersCount,
+      powerCustomersCount: segmentBreakdown.vip_power || 0,
+      avgTrxPerCustomer,
+      segmentBreakdown,
+      topCustomer: allCustomers[0] || null,
+      topOutletByRepeat: outletSummaries[0] || null,
+    },
+    customers: pagedCustomers,
+    pagination: {
+      total: totalFiltered,
+      page: safePage,
+      limit: limitNum,
+      totalPages,
+    },
+    outletSummaries,
+    availableOutlets,
+  };
+}
+
+/**
+ * Computes deep 360° habit detail for a single target customer number (tujuan).
+ */
+export function computeCustomerHabitDetail({
+  transactions = [],
+  dates = [],
+  periodLabel = '-',
+  tujuan = '',
+  categories = [],
+  rules = [],
+}) {
+  const target = String(tujuan || '').trim();
+  const categoriesMap = new Map(categories.map((c) => [c.id, c]));
+  const compiledRules = compileRules(rules);
+  const totalDaysInPeriod = Math.max(1, dates.length || 1);
+
+  const acc = {
+    tujuan: target,
+    totalTrx: 0,
+    gagalTrx: 0,
+    totalOmset: 0,
+    totalLaba: 0,
+    totalKomisi: 0,
+    dateCounts: new Map(),
+    hourlyCounts: Array(24).fill(0),
+    dowCounts: Array(7).fill(0),
+    outlets: new Map(),
+    categories: new Map(),
+    products: new Map(),
+  };
+
+  const hourlyDistribution = Array.from({ length: 24 }, (_, hr) => ({
+    hour: hr,
+    label: `${String(hr).padStart(2, '0')}:00`,
+    trx: 0,
+    omset: 0,
+  }));
+  const dayOfWeekDistribution = INDO_DAY_NAMES.map((label, dow) => ({
+    dow,
+    label,
+    trx: 0,
+    omset: 0,
+  }));
+  const dailyMap = new Map();
+  const matchedTx = [];
+
+  for (const tx of transactions) {
+    if (String(tx.tujuan || '').trim() !== target) continue;
+
+    const outletEval = evaluateOutlet(tx.reseller, tx.pengirim);
+    const prodEval = evaluateProduct(tx.produk, tx.modul, compiledRules, categoriesMap);
+    const hr = Math.max(0, Math.min(23, Number(tx.hour) || 0));
+
+    matchedTx.push({
+      id: tx.id,
+      tglEntri: tx.tglEntri,
+      date: tx.date,
+      hour: hr,
+      reseller: outletEval.outletName,
+      outletCode: outletEval.outletCode,
+      produk: tx.produk,
+      categoryName: prodEval.categoryName,
+      subCategory: prodEval.subCategory,
+      hrgJual: tx.hrgJual || 0,
+      laba: tx.laba || 0,
+      komisi: tx.komisi || 0,
+      status: tx.status,
+      modul: tx.modul,
+    });
+
+    if (tx.status !== 'Sukses') {
+      acc.gagalTrx++;
+      continue;
+    }
+
+    acc.totalTrx++;
+    acc.totalOmset += tx.hrgJual || 0;
+    acc.totalLaba += tx.laba || 0;
+    acc.totalKomisi += tx.komisi || 0;
+
+    hourlyDistribution[hr].trx++;
+    hourlyDistribution[hr].omset += tx.hrgJual || 0;
+    acc.hourlyCounts[hr]++;
+
+    if (tx.date) {
+      acc.dateCounts.set(tx.date, (acc.dateCounts.get(tx.date) || 0) + 1);
+      const dow = getDayOfWeekFromDateStr(tx.date);
+      acc.dowCounts[dow]++;
+      dayOfWeekDistribution[dow].trx++;
+      dayOfWeekDistribution[dow].omset += tx.hrgJual || 0;
+
+      if (!dailyMap.has(tx.date)) {
+        dailyMap.set(tx.date, {
+          date: tx.date,
+          dayLabel: INDO_DAY_NAMES[dow],
+          trx: 0,
+          omset: 0,
+          outlets: new Map(),
+          products: new Map(),
+        });
+      }
+      const dEntry = dailyMap.get(tx.date);
+      dEntry.trx++;
+      dEntry.omset += tx.hrgJual || 0;
+      dEntry.outlets.set(outletEval.outletName, (dEntry.outlets.get(outletEval.outletName) || 0) + 1);
+      dEntry.products.set(tx.produk, (dEntry.products.get(tx.produk) || 0) + 1);
+    }
+
+    if (!acc.outlets.has(outletEval.outletName)) {
+      acc.outlets.set(outletEval.outletName, {
+        outletName: outletEval.outletName,
+        outletCode: outletEval.outletCode,
+        groupId: outletEval.groupId,
+        groupShortName: outletEval.groupShortName,
+        subCluster: outletEval.subCluster,
+        trx: 0,
+        omset: 0,
+      });
+    }
+    const oAcc = acc.outlets.get(outletEval.outletName);
+    oAcc.trx++;
+    oAcc.omset += tx.hrgJual || 0;
+
+    const catMeta = categoriesMap.get(prodEval.categoryId);
+    if (!acc.categories.has(prodEval.categoryId)) {
+      acc.categories.set(prodEval.categoryId, {
+        categoryId: prodEval.categoryId,
+        name: prodEval.categoryName,
+        shortName: catMeta?.shortName || prodEval.categoryName,
+        color: catMeta?.color || '#6366f1',
+        trx: 0,
+        omset: 0,
+      });
+    }
+    const cCat = acc.categories.get(prodEval.categoryId);
+    cCat.trx++;
+    cCat.omset += tx.hrgJual || 0;
+
+    if (!acc.products.has(tx.produk)) {
+      acc.products.set(tx.produk, {
+        produk: tx.produk,
+        subCategory: prodEval.subCategory,
+        trx: 0,
+        omset: 0,
+      });
+    }
+    const cProd = acc.products.get(tx.produk);
+    cProd.trx++;
+    cProd.omset += tx.hrgJual || 0;
+  }
+
+  const profile = finalizeCustomerHabitRecord(acc, { totalDaysInPeriod, globalOutletMap: null });
+
+  const outletBreakdown = Array.from(acc.outlets.values())
+    .sort((a, b) => b.trx - a.trx || b.omset - a.omset)
+    .map((o) => ({
+      ...o,
+      sharePct: acc.totalTrx > 0 ? Number(((o.trx / acc.totalTrx) * 100).toFixed(1)) : 0,
+    }));
+
+  const categoryBreakdown = Array.from(acc.categories.values())
+    .sort((a, b) => b.trx - a.trx || b.omset - a.omset)
+    .map((c) => ({
+      ...c,
+      sharePct: acc.totalTrx > 0 ? Number(((c.trx / acc.totalTrx) * 100).toFixed(1)) : 0,
+    }));
+
+  const productBreakdown = Array.from(acc.products.values()).sort(
+    (a, b) => b.trx - a.trx || b.omset - a.omset
+  );
+
+  const dailyTimeline = Array.from(dailyMap.values())
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .map((d) => ({
+      date: d.date,
+      dayLabel: d.dayLabel,
+      trx: d.trx,
+      omset: d.omset,
+      outlets: Array.from(d.outlets.entries())
+        .sort((a, b) => b[1] - a[1])
+        .map(([name, count]) => ({ name, count })),
+      topProducts: Array.from(d.products.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([produk, count]) => ({ produk, count })),
+    }));
+
+  matchedTx.sort((a, b) => String(b.tglEntri).localeCompare(String(a.tglEntri)));
+
+  return {
+    periodLabel,
+    totalDaysInPeriod,
+    profile,
+    hourlyDistribution,
+    dayOfWeekDistribution,
+    dailyTimeline,
+    outletBreakdown,
+    categoryBreakdown,
+    productBreakdown,
+    transactions: matchedTx.slice(0, 200),
+    totalMatchedTransactions: matchedTx.length,
+  };
 }
