@@ -330,13 +330,13 @@ export function saveOutletLocation(entry) {
   const list = getOutletLocations();
   const key = String(entry.outletName || '').trim().toUpperCase();
   const normalized = {
-    outletName: String(entry.outletName || '').trim(),
-    outletCode: String(entry.outletCode || '-').trim(),
+    outletName: String(entry.outletName || '').trim().slice(0, 120),
+    outletCode: String(entry.outletCode || '-').trim().slice(0, 40),
     lat: Number(entry.lat),
     lng: Number(entry.lng),
-    address: String(entry.address || '').trim(),
-    city: String(entry.city || '').trim(),
-    notes: String(entry.notes || '').trim(),
+    address: String(entry.address || '').trim().slice(0, 300),
+    city: String(entry.city || '').trim().slice(0, 100),
+    notes: String(entry.notes || '').trim().slice(0, 500),
     updatedAt: new Date().toISOString(),
   };
 
@@ -358,19 +358,19 @@ export function saveOutletLocationsBulk(entries) {
   );
   let savedCount = 0;
   for (const entry of entries) {
-    const name = String(entry.outletName || '').trim();
-    const lat = Number(entry.lat);
-    const lng = Number(entry.lng);
+    const name = String(entry?.outletName || '').trim().slice(0, 120);
+    const lat = Number(entry?.lat);
+    const lng = Number(entry?.lng);
     if (!name || !Number.isFinite(lat) || !Number.isFinite(lng)) continue;
     if (lat < -90 || lat > 90 || lng < -180 || lng > 180) continue;
     byKey.set(name.toUpperCase(), {
       outletName: name,
-      outletCode: String(entry.outletCode || '-').trim(),
+      outletCode: String(entry.outletCode || '-').trim().slice(0, 40),
       lat,
       lng,
-      address: String(entry.address || '').trim(),
-      city: String(entry.city || '').trim(),
-      notes: String(entry.notes || '').trim(),
+      address: String(entry.address || '').trim().slice(0, 300),
+      city: String(entry.city || '').trim().slice(0, 100),
+      notes: String(entry.notes || '').trim().slice(0, 500),
       updatedAt: new Date().toISOString(),
     });
     savedCount++;

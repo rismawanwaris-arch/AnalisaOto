@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import L from 'leaflet';
+import { escapeHtml } from '../utils/escape.js';
 import 'leaflet/dist/leaflet.css';
 import {
   MapPin,
@@ -308,7 +309,7 @@ export default function OutletMapView({
         fillColor: '#fbbf24',
         fillOpacity: 0.45,
       }).addTo(map);
-      marker.bindTooltip(`Preview Titik: ${selectedOutletName || 'Cabang'}`, {
+      marker.bindTooltip(`Preview Titik: ${escapeHtml(selectedOutletName || 'Cabang')}`, {
         direction: 'top',
       });
       draftMarkerRef.current = marker;
@@ -470,17 +471,17 @@ export default function OutletMapView({
       const habit = outlet.customerHabit || {};
       const timeRowHtml =
         hourFilter !== 'all'
-          ? `<div style="font-size:11px;color:#0ea5e9"><b>${activeTimeLabel}:</b> ${formatNumber(scoped.trx)} Trx (${formatCompactRupiah(scoped.omset)})</div>`
+          ? `<div style="font-size:11px;color:#0ea5e9"><b>${escapeHtml(activeTimeLabel)}:</b> ${formatNumber(scoped.trx)} Trx (${formatCompactRupiah(scoped.omset)})</div>`
           : '';
       circle.bindTooltip(
         `<div style="min-width:180px;font-family:Inter,sans-serif">
-          <div style="font-weight:800;font-size:12px;margin-bottom:2px">${outlet.outletName}</div>
-          <div style="font-size:11px;opacity:0.85">${outlet.subCluster || outlet.groupName}</div>
+          <div style="font-weight:800;font-size:12px;margin-bottom:2px">${escapeHtml(outlet.outletName)}</div>
+          <div style="font-size:11px;opacity:0.85">${escapeHtml(outlet.subCluster || outlet.groupName)}</div>
           <hr style="margin:4px 0;opacity:0.2"/>
           ${timeRowHtml}
           <div style="font-size:11px">Total 24J: <b>${formatNumber(outlet.trxD1)} Trx</b> | <b>${formatCompactRupiah(outlet.omsetD1)}</b></div>
           <div style="font-size:11px">Repeat Pelanggan: <b>${habit.repeatRateD1 ?? 0}%</b> (${habit.uniqueCustomersD1 ?? 0} tujuan)</div>
-          <div style="font-size:11px">Jam Puncak: <b>${outlet.peakHour || '-'}</b></div>
+          <div style="font-size:11px">Jam Puncak: <b>${escapeHtml(outlet.peakHour || '-')}</b></div>
         </div>`,
         { direction: 'top', sticky: true }
       );
@@ -497,7 +498,7 @@ export default function OutletMapView({
         const badgeText = formatPinBadgeLabel(val);
         if (compact) {
           const shortCode =
-            outlet.outletCode && outlet.outletCode !== '-' ? `${outlet.outletCode} • ` : '';
+            outlet.outletCode && outlet.outletCode !== '-' ? `${escapeHtml(outlet.outletCode)} • ` : '';
           const groupCls =
             val === 0
               ? 'map-pill-badge--zero'
@@ -639,7 +640,7 @@ export default function OutletMapView({
             .slice(0, 6)
             .map(
               (g) =>
-                `<div style="font-size:11px">• ${g.item.outlet.outletName}: <b>${formatPinBadgeLabel(g.item.val)}</b></div>`
+                `<div style="font-size:11px">• ${escapeHtml(g.item.outlet.outletName)}: <b>${formatPinBadgeLabel(g.item.val)}</b></div>`
             )
             .join('');
           clusterMarker.bindTooltip(

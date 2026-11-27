@@ -6,10 +6,11 @@ FROM node:20-alpine AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm ci
 
 COPY index.html vite.config.js tailwind.config.js postcss.config.js ./
 COPY src ./src
+COPY public ./public
 
 RUN npm run build
 
@@ -27,7 +28,7 @@ ENV DATA_DIR=/app/data
 RUN apk add --no-cache su-exec
 
 COPY package.json package-lock.json* ./
-RUN npm install --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 COPY server ./server

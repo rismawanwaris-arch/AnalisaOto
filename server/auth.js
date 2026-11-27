@@ -63,6 +63,14 @@ function verifyScryptPassword(password, salt, expectedHashHex) {
   return crypto.timingSafeEqual(derived, expected);
 }
 
+let dummyCredentialCache = null;
+function getDummyCredential() {
+  if (!dummyCredentialCache) {
+    dummyCredentialCache = hashPassword(crypto.randomBytes(16).toString('hex'));
+  }
+  return dummyCredentialCache;
+}
+
 function constantTimeStringEqual(a, b) {
   const bufA = Buffer.from(String(a || ''), 'utf-8');
   const bufB = Buffer.from(String(b || ''), 'utf-8');
@@ -383,7 +391,14 @@ export function handleLogin(req, res) {
     return res.status(400).json({ error: 'Username dan password wajib diisi.' });
   }
   const user = findUserByUsername(username);
-  if (!user || !verifyScryptPassword(password, user.salt, user.hash)) {
+  // Always run scrypt (dummy hash for unknown users) so response time does not reveal valid usernames.
+  const dummy = getDummyCredential();
+  const passwordOk = verifyScryptPassword(
+    String(password).slice(0, 256),
+    user ? user.salt : dummy.salt,
+    user ? user.hash : dummy.hash
+  );
+  if (!user || !passwordOk) {
     return res.status(401).json({ error: 'Username atau password salah.' });
   }
   if (user.active === false) {

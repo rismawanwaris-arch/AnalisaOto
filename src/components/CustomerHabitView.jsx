@@ -36,6 +36,7 @@ import {
 } from '../utils/format.js';
 import { sortArray, toggleSortConfig } from '../utils/sort.js';
 import SortableTh from './SortableTh.jsx';
+import { csvCell } from '../utils/escape.js';
 
 const SEGMENT_BADGE_CLASSES = {
   vip_power: 'bg-amber-500/15 text-amber-300 border-amber-500/40',
@@ -341,7 +342,7 @@ export default function CustomerHabitView({
       'Total Omset',
       'Rata-rata Tiket',
     ];
-    const escapeCsv = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
+    const escapeCsv = csvCell;
     const rows = customers.map((c, idx) =>
       [
         (pagination.page - 1) * pagination.limit + idx + 1,

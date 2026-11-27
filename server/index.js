@@ -69,19 +69,18 @@ app.use(
     frameguard: { action: 'deny' },
     contentSecurityPolicy: {
       directives: {
+        // Zero third-party browser egress: map tiles are fetched through our own /api/map-tiles proxy,
+        // fonts are local/system, and no inline scripts are allowed.
         defaultSrc: ["'self'"],
-        scriptSrc: ["'self'", "'unsafe-inline'"],
-        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
-        imgSrc: [
-          "'self'",
-          'data:',
-          'blob:',
-          'https://tile.openstreetmap.org',
-          'https://*.tile.openstreetmap.org',
-          'https://*.basemaps.cartocdn.com',
-        ],
+        scriptSrc: ["'self'"],
+        scriptSrcAttr: ["'none'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        fontSrc: ["'self'", 'data:'],
+        imgSrc: ["'self'", 'data:', 'blob:'],
         connectSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        baseUri: ["'self'"],
+        formAction: ["'self'"],
         frameAncestors: ["'none'"],
         upgradeInsecureRequests: null,
       },
@@ -1055,6 +1054,9 @@ app.post('/api/outlet-locations/bulk', requireRole('admin', 'analyst'), (req, re
     if (!Array.isArray(entries) || entries.length === 0) {
       return res.status(400).json({ error: 'Daftar koordinat (entries) tidak boleh kosong.' });
     }
+    if (entries.length > 500) {
+      return res.status(400).json({ error: 'Maksimal 500 koordinat per impor.' });
+    }
     const result = saveOutletLocationsBulk(entries);
     res.json({ success: true, ...result });
   } catch (err) {
@@ -1080,8 +1082,8 @@ app.get('/api/map-tiles/:z/:x/:y.png', async (req, res) => {
   const y = parseInt(req.params.y, 10);
   if (
     !Number.isInteger(z) || z < 0 || z > 19 ||
-    !Number.isInteger(x) || x < 0 ||
-    !Number.isInteger(y) || y < 0
+    !Number.isInteger(x) || x < 0 || x >= 2 ** z ||
+    !Number.isInteger(y) || y < 0 || y >= 2 ** z
   ) {
     return res.status(400).end();
   }
@@ -1092,14 +1094,20 @@ app.get('/api/map-tiles/:z/:x/:y.png', async (req, res) => {
     return res.send(tileCache.get(key));
   }
   try {
+    // Only outbound destination of this server: fixed host, integer-validated path, no cookies/user data sent.
     const upstream = await fetch(`https://tile.openstreetmap.org/${key}.png`, {
       headers: {
         'User-Agent': 'AnalisaOto/1.0 (ZimaOS Private Dashboard)',
-        Accept: 'image/png,*/*',
+        Accept: 'image/png',
       },
+      redirect: 'error',
+      signal: AbortSignal.timeout(8000),
     });
     if (!upstream.ok) {
-      return res.status(upstream.status).end();
+      return res.status(upstream.status === 404 ? 404 : 502).end();
+    }
+    if (!String(upstream.headers.get('content-type') || '').startsWith('image/png')) {
+      return res.status(502).end();
     }
     const buf = Buffer.from(await upstream.arrayBuffer());
     if (tileCache.size >= 500) {
